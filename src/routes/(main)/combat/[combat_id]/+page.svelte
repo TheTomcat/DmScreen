@@ -17,7 +17,7 @@
 	import InitiativeBox from '../../../../components/InitiativeBox.svelte';
 
 	import { page } from '$app/stores';
-	import { Crown, PlusSquare, Rat, SunMedium, ThermometerSnowflake } from 'lucide-svelte';
+	import { Crown, PlusSquare, Rat } from 'lucide-svelte';
 	import { roll } from '$lib';
 
 	let combat_id = parseInt($page.params.combat_id);

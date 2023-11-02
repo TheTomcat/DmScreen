@@ -12,5 +12,5 @@
 </script>
 
 {#each allCombats as combat}
-	{combat.combat_id} - {combat.title} <br />
+	<a href={`/combat/${combat.combat_id}`}>{combat.combat_id} - {combat.title} </a><br />
 {/each}
