@@ -145,3 +145,11 @@ export function apiGetCombat(fetch: Function, combat_id: number): Promise<Combat
 export function apiCreateCombat(fetch: Function, title: string): Promise<Combat> {
     return apiCall(fetch, `/api/combat`, "POST", { title })
 }
+
+export function apiCreateNewEntity(fetch: Function, entity: Partial<Entity>): Promise<Entity> {
+    return apiCall(fetch, `/api/entity`, "PUT", entity)
+}
+
+export function apiModifyEntity(fetch: Function, entity: Partial<Entity>): Promise<Entity> {
+    return apiCall(fetch, `/api/entity`, "PATCH", entity)
+}

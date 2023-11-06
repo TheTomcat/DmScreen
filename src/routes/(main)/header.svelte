@@ -21,7 +21,10 @@
 			<a href="/combat" data-sveltekit-prefetch>Combat</a>
 		</li>
 		<li>
-			<a href="/loading" data-sveltekit-prefetch>Session</a>
+			<a href="/library" data-sveltekit-prefetch>Library</a>
+		</li>
+		<li>
+			<a href="/player" data-sveltekit-prefetch>Player View</a>
 		</li>
 	</ul>
 	<button>Button</button>

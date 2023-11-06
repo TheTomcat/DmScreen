@@ -1,14 +1,16 @@
 <script lang="ts">
-	import EntityRow from '../../../components/EntityRow.svelte';
+	import EntityRow from '../../../../components/EntityRow.svelte';
 	import { onMount } from 'svelte';
 
-	import InputBox from '../../../components/InputBox.svelte';
-	import type { Entity, Participant, Combat } from '../../../app';
+	import InputBox from '../../../../components/InputBox.svelte';
+	import type { Entity, Participant, Combat } from '../../../../app';
 
-	import { Minus, Plus, PlusSquare, X } from 'lucide-svelte';
+	import { Edit, Minus, Plus, PlusSquare, X } from 'lucide-svelte';
 	import { apiAddParticipantToCombat, apiCreateCombat } from '$lib/api';
 	import { roll } from '$lib';
 	import { flip } from 'svelte/animate';
+	import Modal from '../../../../components/Modal.svelte';
+	import EntityBox from '../../../../components/EntityBox.svelte';
 
 	//https://svelte.dev/repl/6fbaf2115a31423b9e5b989423dce38a?version=3.42.5 Shake animation
 	export let data;
@@ -19,10 +21,13 @@
 	let showPCs: boolean = false;
 	let showNPCs: boolean = true;
 	let title: string;
+	// let dialogVisible: boolean = true;
 
 	let combatants: { entity: Entity; count: number }[] = [];
 
 	let flipDurationMs: number = 200;
+
+	// let entitybox;
 
 	onMount(() => {
 		allEntities = data.entities;
@@ -120,6 +125,7 @@
 				{#each filteredEntities as entity (entity.entity_id)}
 					<EntityRow {entity}>
 						<button on:click={addCombatant(entity)}><PlusSquare /></button>
+						<!-- <button on:click={() => (entitybox.showModal = true)}><Edit /></button> -->
 					</EntityRow>
 				{/each}
 			</div>
@@ -183,6 +189,8 @@
 		{/if}
 	</div>
 </div>
+
+<!-- <EntityBox bind:dialogVisible bind:this={entitybox} /> -->
 
 <style>
 	.container {

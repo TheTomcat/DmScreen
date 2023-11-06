@@ -1,11 +1,25 @@
 <script lang="ts">
-	import { apiGetImageById, apiGetRandomImage } from '$lib/api';
+	import { apiGetCombat, apiGetImageById, apiGetRandomImage } from '$lib/api';
 	import { onMount } from 'svelte';
+	import type { Combat, Participant } from '../../../app';
 	let imageBox: HTMLElement;
 	let messageBox: HTMLElement;
 	let is_transitioning: boolean = false;
 	let message: string = '';
-	let mode = 'loading';
+	let mode = 'combat';
+	let combat: Combat;
+
+	onMount(() => {
+		apiGetCombat(fetch, 1).then((c) => {
+			combat = c;
+		});
+	});
+
+	const preloadImage = (url: string, onload: (e: Event) => {}) => {
+		let imageObject = new Image();
+		imageObject.src = url;
+		imageObject.addEventListener('load', onload);
+	};
 
 	const fetchNewImage = (image_id: number | null = null) => {
 		const setImageAsBackground = (suppliedImageId: number) => {
@@ -55,6 +69,11 @@
 		fetchNewImage();
 		schedulePageUpdate();
 	});
+
+	const getNextPCOnDeck = (combat: Combat, currentParticipantID: number): Participant => {
+		return combat.participants[0];
+		// let p = combat.participants.find(p => p.is_PC, true)
+	};
 </script>
 
 <div bind:this={imageBox} id="image" class:transitioning={is_transitioning} />
@@ -68,8 +87,66 @@
 {#if message}
 	<div id="fakecontent" bind:this={messageBox}>{@html message}</div>
 {/if}
+{#if mode == 'combat' && combat}
+	<div class="container">
+		<div class="overlay combatants">
+			<table>
+				<thead>
+					<th />
+					<th>Name</th>
+				</thead>
+				<tbody>
+					{#each combat.participants
+						.filter((p) => p.is_visible)
+						.toSorted((a, b) => b.initiative - a.initiative) as participant, i (participant.participant_id)}
+						<tr>
+							<td>{participant.initiative}</td>
+							<td>{participant.name}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+		<div class="overlay name">Text2</div>
+		<div class="overlay portrait">Text2</div>
+		<div class="overlay upnext">Up Next:</div>
+	</div>
+{/if}
 
 <style>
+	.container {
+		position: absolute;
+		width: 100%;
+		height: 100%;
+		display: grid;
+		column-gap: var(--size-7);
+		row-gap: var(--size-7);
+		padding: var(--size-7);
+		grid-template-columns: 1fr 2fr;
+		grid-template-rows: 1fr 3fr 1fr;
+		/* background-color: red; */
+	}
+	.overlay {
+		background-color: rgba(216, 216, 216, 0.4);
+		/* opacity: 0.8; */
+		align-self: stretch;
+		justify-self: stretch;
+		border-radius: var(--size-3);
+		padding: var(--size-3);
+	}
+	.combatants {
+		grid-area: 1 / 1 / 4 / 2;
+		/* background-color: antiquewhite; */
+	}
+	.portrait {
+		grid-area: 2 / 2 / 3 / 3;
+	}
+	.name {
+		grid-area: 1/2/2/3;
+	}
+	.upnext {
+		grid-area: 3/2/4/3;
+	}
 	.loader {
 		position: absolute;
 		top: calc(50% - 100px);
