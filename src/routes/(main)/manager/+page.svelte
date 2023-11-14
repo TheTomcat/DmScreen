@@ -1,103 +1,86 @@
 <script lang="ts">
-	import type { _ImageMatch, Image, Tag } from '../../../app';
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
 
-	import ImageTag from '../../../components/ImageTag.svelte';
-	import Autocomplete from '../../../components/Autocomplete.svelte';
+	import type { components } from '$lib/api/v1';
+	import ImageManager from '$lib/components/new/ImageManager.svelte';
+	import { goto } from '$app/navigation';
 
-	import {
-		apiApplyTagIdToImage,
-		apiCreateNewTag,
-		apiGetImageById,
-		apiGetTagsOfImage,
-		apiRemoveTagIdFromImage
-	} from '$lib/api';
+	export let data;
 
-	export let data: { tags: Tag[] };
+	type Image = components['schemas']['ImageURL'];
 
-	let allTags: Tag[] = [];
-	let selectedTags: Tag[] = [];
+	const imageTypes = ['backdrop', 'character', 'handout', 'map'] as const;
 
-	let image_id = 1;
-	let impromise: Promise<Image>;
+	let image: Image | null;
+	let state: 'loading' | 'error' | 'done' = 'done';
+	let searchInput: HTMLInputElement;
 
-	$: if (document) {
-		impromise = apiGetImageById(fetch, image_id);
-		apiGetTagsOfImage(fetch, image_id).then((response) => (selectedTags = response));
-	}
-
-	// const updateImage = () => {
-	// 	apiGetImageById(fetch, image_id).then((response) => (image = response));
-	// };
+	const searchParams = new URLSearchParams('image=1');
+	let image_id: number = 1;
+	$: image_id = parseInt($page.url.searchParams.get('image')?.toString() || '1');
 
 	onMount(() => {
-		allTags = data.tags;
-		// updateImage();
+		if (data.error || !data.data) {
+			state = 'error';
+			return;
+		}
+		image_id = data.data.image_id;
+		image = data.data;
+		state = 'done';
 	});
 
-	const createNewTag = (tagName: string) => {
-		return apiCreateNewTag(fetch, { tag: tagName }).then((tag) => {
-			allTags = [...allTags, tag];
-			return tag;
+	const go = () => {
+		goto(`?${searchParams.toString()}`, { replaceState: true }).then(() => {
+			if (data.data) {
+				image = data.data;
+				state = 'done';
+				searchInput.focus();
+			}
 		});
 	};
 
-	const handleTagSubmit = (tag: Tag | string) => {
-		if (tag === '') {
-			console.log('empty string', image_id);
-			image_id += 1;
-			return;
-		}
-		if (typeof tag == 'string') {
-			createNewTag(tag).then((tag) => {
-				tagImage(tag);
-			});
-			return;
-		}
-		tagImage(tag);
+	const next = () => {
+		searchParams.set('image', (image_id + 1).toString());
+		state = 'loading';
+		go();
 	};
-
-	const tagImage = (tag: Tag) => {
-		apiApplyTagIdToImage(fetch, image_id, tag.tag_id).then((image) => {
-			selectedTags = [...selectedTags, tag];
-		});
-	};
-
-	const addTag = (tag: Tag | string) => {
-		if (typeof tag == 'string') {
-			apiCreateNewTag(fetch, { tag }).then((tag) => {
-				selectedTags = [...selectedTags, tag];
-				allTags = [...allTags, tag];
-			});
-			return;
-		} else {
-			if (selectedTags.includes(tag)) return;
-			selectedTags = [...selectedTags, tag];
-			console.log(selectedTags);
-		}
-	};
-	const removeTag = (tag: Tag) => {
-		selectedTags = selectedTags.filter((_tag) => _tag.tag_id != tag.tag_id);
-		apiRemoveTagIdFromImage(fetch, image_id, tag.tag_id);
+	const prev = () => {
+		if (image_id == 1) return;
+		searchParams.set('image', (image_id - 1).toString());
+		state = 'loading';
+		go();
 	};
 </script>
 
-<dialog open>
-	<h1>Tag Manager</h1>
-	{#await impromise then image}
-		<img src={`${image.thumbnail}?width=500`} alt={image.filename} />
-	{/await}
-	<Autocomplete
-		allItems={allTags}
-		getValue={(tag) => tag.tag}
-		getID={(tag) => tag.tag_id}
-		placeholder={'Enter a Tag'}
-		onSubmitCallback={handleTagSubmit}
-		allowCreation={true}
-	/>
-	<div class="tags">
-		{#each selectedTags as tag (tag.tag_id)}
-			<ImageTag {tag} onClick={() => removeTag(tag)} />
-		{/each}
-	</div>
-</dialog>
+<div class="container">
+	{#if state == 'error'}
+		<div class="error">An unexpected error occurred.</div>
+	{:else if image}
+		<ImageManager {image} on:emptysubmit={next} bind:searchInput />
+		<div class="nav">
+			<button on:click={prev} disabled={image_id === 1}>Previous</button><button on:click={next}
+				>Next</button
+			>
+		</div>
+	{/if}
+</div>
+
+<style>
+	.container {
+		max-width: 800px;
+		margin: auto;
+		padding: var(--size-3);
+	}
+	.nav {
+		grid-area: nav;
+		display: flex;
+		flex-direction: row;
+		justify-content: space-between;
+	}
+	.nav button {
+		width: var(--size-12);
+		background-color: var(--surface-4);
+		padding: var(--size-3);
+	}
+</style>

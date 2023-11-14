@@ -9,22 +9,16 @@
 
 	<ul class="links">
 		<li>
-			<a href="/messages" data-sveltekit-prefetch>Messages</a>
+			<a href="/build">Build</a>
 		</li>
 		<li>
-			<a href="/gallery" data-sveltekit-prefetch>Gallery</a>
+			<a href="/maintain">Manage</a>
 		</li>
 		<li>
-			<a href="/manager" data-sveltekit-prefetch>Manager</a>
+			<a href="/run">Run</a>
 		</li>
 		<li>
-			<a href="/combat" data-sveltekit-prefetch>Combat</a>
-		</li>
-		<li>
-			<a href="/library" data-sveltekit-prefetch>Library</a>
-		</li>
-		<li>
-			<a href="/player" data-sveltekit-prefetch>Player View</a>
+			<a href="/view">View</a>
 		</li>
 	</ul>
 	<button>Button</button>

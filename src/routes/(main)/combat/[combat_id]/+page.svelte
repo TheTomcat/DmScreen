@@ -7,14 +7,14 @@
 		addParticipant,
 		removeParticipant,
 		updateParticipant
-	} from '../../../../stores/combatStore';
-	import EntityRow from '../../../../components/EntityRow.svelte';
+	} from '$lib/stores/combatStore';
+	import EntityRow from '$lib/components/EntityRow.svelte';
 	import { onMount } from 'svelte';
-	import InputBox from '../../../../components/InputBox.svelte';
+	import InputBox from '$lib/components/InputBox.svelte';
 	import type { Combat, Entity, Participant, RollMode } from '../../../../app';
 	import { apiAddParticipantToCombat, apiGetAllEntities } from '$lib/api';
-	import CombatTable from '../../../../components/CombatTable.svelte';
-	import InitiativeBox from '../../../../components/InitiativeBox.svelte';
+	import CombatTable from '$lib/components/CombatTable.svelte';
+	import InitiativeBox from '$lib/components/InitiativeBox.svelte';
 
 	import { page } from '$app/stores';
 	import { Crown, PlusSquare, Rat } from 'lucide-svelte';

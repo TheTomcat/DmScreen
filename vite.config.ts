@@ -6,11 +6,21 @@ export default defineConfig({
 	server: {
 		proxy: {
 			'/api': {
-				target: 'http://localhost:5000',
+				target: 'http://localhost:8000',
 				changeOrigin: true,
 				// toProxy: true,
 				// headers: { 'Accept-Type': 'application/json' },
-				//rewrite: (path) => {}
+				rewrite: (path) => {
+					return path.slice(4)
+				}
+			},
+			'/live': {
+				target: 'ws://localhost:8000/',
+				ws: true,
+				changeOrigin: true,
+				// rewrite: (path) => {
+				// 	return path.slice(5)
+				// }
 			}
 		}
 	}
