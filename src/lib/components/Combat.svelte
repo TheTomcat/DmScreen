@@ -1,56 +1,33 @@
 <script lang="ts">
 	import CombatInitiativeOrder from '$lib/components/CombatInitiativeOrder.svelte';
 	import type { components } from '$lib/api/v1';
-	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { ChevronRightSquare, DicesIcon, PauseOctagon } from 'lucide-svelte';
 	import Modal from '$lib/components/Modal.svelte';
+	import Dialog from '$lib/components/Dialog.svelte';
 	import InitiativeRoller from '$lib/components/InitiativeRoller.svelte';
-	import ParticipantRow from '$lib/components/ParticipantRow.svelte';
-	//import { isActive } from '$lib/stores/combatStore';
 	import type { Participant } from '../../app.js';
-	import { combat } from '$lib/ws';
-	import {
-		// combat,
-		loadCombat,
-		setInitiatives,
-		set_active_participant,
-		suspendCombat
-	} from '$lib/stores/combatStore';
-	import { sessionStore } from '$lib/stores/sessionStore.js';
-	import { page } from '$app/stores';
+	import { combat, wsController } from '$lib/ws';
 	import { get_next_alive_participant_id, sort_participants_naive } from '$lib';
 	import { createEventDispatcher } from 'svelte';
 	import client from '$lib/api/index.js';
 	type Combat = components['schemas']['Combat'];
 
-	// export let data;
-	// let combat: Combat;
 	let dialog: HTMLDialogElement;
+	let initDialog: Dialog;
 	let showModal = false;
-	export let combat_id: number = 0; // = parseInt($page.url.searchParams.get('combat_id') || '1');
-	let session_id = parseInt($page.url.searchParams.get('session_id') || '1');
-	const dispatch = createEventDispatcher();
-	// onMount(() => {
-	// 	if (!browser) return;
-	// 	// if (!data?.data) return;
-	// 	// client.GET('/session/{session_id}', {params: {path: {session_id}}}).then(response => {
-	// 	// 	if (!response.data) return
-	// 	// 	combat_id = response.data.
 
-	// 	// })
+	export let ws: wsController;
 
-	// 	loadCombat(combat_id);
-	// 	// combat = data.data;
-	// });
+	const dispatch = createEventDispatcher<{
+		begin_combat: any;
+		advance_combat: any;
+		suspend_combat: any;
+	}>();
 
 	function rollInitiative(event: MouseEvent & { currentTarget: EventTarget & HTMLButtonElement }) {
 		showModal = true;
 		dialog.showModal();
-		// console.log(showModal);
-		// Show initiative roller box
-		// Set initiatives
-		// SmartName as needed
 	}
 
 	let currentActiveParticipant: Participant | undefined;
@@ -67,10 +44,12 @@
 		detail: { initiatives: { participant_id: number; initiative: number }[] };
 	}) => {
 		// console.log(e.detail);
-		setInitiatives(combat_id, e.detail.initiatives, true);
-		// Smart Name Here?
-		dispatch('begin_combat');
-		dialog.close();
+		if ($combat && $combat.combat_id) {
+			setInitiatives($combat?.combat_id, e.detail.initiatives, true);
+			// Smart Name Here?
+			dispatch('begin_combat');
+			dialog.close();
+		}
 		// currentActiveParticipant = $combat.participants.sort(sort_participants_naive)[0];
 	};
 	const onSuspendCombat = () => {
@@ -79,9 +58,8 @@
 	};
 	const advanceCombat = (e: Event) => {
 		let next_participant: number;
-		let first_participant: number = $combat
-			? $combat.participants.toSorted(sort_participants_naive)[0].participant_id
-			: 0;
+		let first_participant: number =
+			$combat.participants.toSorted(sort_participants_naive)[0].participant_id;
 		let increment_round: boolean = false;
 		if (!$combat) return;
 		if ($combat.active_participant_id) {
@@ -116,11 +94,20 @@
 		</div>
 	{/if}
 </div>
-<Modal {showModal} bind:dialog params={{ allowCasualDismiss: false, showClose: false }}>
+<Dialog mode="mega" bind:this={initDialog}>
+	<section class="icon-header" slot="header">
+		<DicesIcon />Roll for Initiative
+	</section>
 	{#if $combat && $combat.participants}
 		<InitiativeRoller participants={$combat.participants} on:begin={onBegin} />
 	{/if}
-</Modal>
+</Dialog>
+
+<!-- <Modal {showModal} bind:dialog params={{ allowCasualDismiss: false, showClose: false }}>
+	{#if $combat && $combat.participants}
+		<InitiativeRoller participants={$combat.participants} on:begin={onBegin} />
+	{/if}
+</Modal> -->
 
 <style>
 	.container {

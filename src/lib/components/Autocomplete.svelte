@@ -12,7 +12,7 @@
 	/**
 	 * A function to return a list of items based on a search query.
 	 */
-	export let getData: ((q: string, callback: Function) => void) | undefined = undefined; //((query: string) => T[]) | undefined = undefined;
+	export let getData: ((q: string) => Promise<T[]>) | undefined = undefined;
 	/**
 	 * Placeholder string to display on the input field
 	 */
@@ -27,6 +27,8 @@
 	 * (item: T) => ID (string | number)
 	 */
 	export let extractId: (item: T) => string | number;
+	export let debounceTime: number = 400;
+	export let useCache: boolean = false;
 	/**
 	 * Callback function that will execute after the autocomplete field "submits" a value.
 	 * onSubmitCallback = (item: T | string) => {}
@@ -39,7 +41,10 @@
 	 */
 	export let allowCreation: boolean = false;
 
-	let asyncMode = false;
+	let cache: { [query: string]: T[] } = {};
+	let mostRecentSearch: string = '';
+	let inFlight: number = 0;
+
 	if ((allItems === undefined) == (getData === undefined)) {
 		console.error('Must supply one of either allItems or getData, but not both.');
 	}
@@ -61,13 +66,32 @@
 		currentIndex = -1;
 	}
 
-	const _filterItems = () => {
+	const cachedGetData = async (query: string) => {
+		if (!getData) return [];
+		inFlight += 1;
+		if (query === '') return [];
+		if (useCache) {
+			if (query in cache) {
+				return cache[query];
+			}
+			let val = await getData(query);
+			cache[query] = val;
+			return val;
+		} else {
+			return getData(query);
+		}
+	};
+
+	const _filterItems = async () => {
 		if (getData) {
-			// console.log('Getting');
-			getData(inputValue, (e: T[]) => {
-				filteredItems = e;
+			mostRecentSearch = inputValue;
+			cachedGetData(inputValue).then((response) => {
+				inFlight -= 1;
+				if (mostRecentSearch == inputValue) {
+					filteredItems = response;
+					currentIndex = 0;
+				}
 			});
-			// console.log(filteredItems);
 		}
 		if (allItems)
 			filteredItems = allItems.filter((item) =>
@@ -78,7 +102,7 @@
 		}
 	};
 
-	const filterItems = debounce(_filterItems, 200);
+	const filterItems = debounce(_filterItems, debounceTime);
 
 	const clearInput = () => {
 		inputValue = '';
@@ -136,6 +160,7 @@
 	const submitUnknownData = (data: T | string) => {
 		if (typeof data == 'string') {
 			// try to find a matching item
+			if (inFlight > 0) console.log('uh oh');
 			let match = filteredItems.find((item) => extractName(item) == data);
 			if (match) {
 				data = match;
@@ -169,14 +194,17 @@
 	{#if filteredItems.length > 0}
 		<ul id="autocomplete-items-list">
 			{#each filteredItems as itemData, i (extractId(itemData))}
-				<li
-					role="listitem"
-					tabindex="0"
-					class="autocomplete-items"
-					class:autocomplete-active={i === currentIndex}
-					on:click={() => submitExistingData(itemData)}
-				>
-					{@html makeMatchBold(extractName(itemData))}
+				<li class="autocomplete-items" class:autocomplete-active={i === currentIndex}>
+					<div
+						role="button"
+						tabindex="0"
+						on:mousedown={(e) => {
+							submitExistingData(itemData);
+						}}
+						on:keydown={() => submitExistingData(itemData)}
+					>
+						{@html makeMatchBold(extractName(itemData))}
+					</div>
 				</li>
 			{/each}
 		</ul>
@@ -221,9 +249,11 @@
 		top: 100%;
 		left: 0;
 		right: 0; */
+		text-align: left;
 		padding: 10px;
 		cursor: pointer;
 		background-color: var(--surface-4);
+		max-inline-size: unset;
 	}
 
 	.autocomplete-items:hover {

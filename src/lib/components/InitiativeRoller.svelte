@@ -5,12 +5,14 @@
 	import { DicesIcon } from 'lucide-svelte';
 	import { roll_dice } from '$lib';
 	import { createEventDispatcher } from 'svelte';
+	import Dialog from './Dialog.svelte';
 
 	const dispatch = createEventDispatcher();
 
 	type Participant = components['schemas']['Participant'];
 
 	export let participants: Participant[];
+	export let dialog: Dialog;
 
 	type Initiative = { participant_id: number; initiative: number };
 	let initiatives: Initiative[] = [];
@@ -52,29 +54,41 @@
 	};
 </script>
 
-<h1>Roll for Initiative!</h1>
-<div class="initiativebox">
-	<div class="PCs">
-		{#each participants as participant (participant.participant_id)}
-			{#if participant.is_PC}
-				<InitiativeRow bind:participant on:initiative_update={onUpdateInitiative} />
-			{/if}
-		{/each}
+<Dialog mode="mega" bind:this={dialog}>
+	<section class="icon-header" slot="header">
+		<DicesIcon />
+		<h3>Roll for Initiative</h3>
+	</section>
+	<div class="content" slot="content">
+		<div class="initiativebox">
+			<div class="PCs">
+				{#each participants as participant (participant.participant_id)}
+					{#if participant.is_PC}
+						<InitiativeRow bind:participant on:initiative_update={onUpdateInitiative} />
+					{/if}
+				{/each}
+			</div>
+			<div class="NPCs">
+				{#each participants as participant (participant.participant_id)}
+					{#if !participant.is_PC}
+						<InitiativeRow bind:participant on:initiative_update={onUpdateInitiative} />
+					{/if}
+				{/each}
+			</div>
+		</div>
 	</div>
-	<div class="NPCs">
-		{#each participants as participant (participant.participant_id)}
-			{#if !participant.is_PC}
-				<InitiativeRow bind:participant on:initiative_update={onUpdateInitiative} />
-			{/if}
-		{/each}
+	<div style="display: flex; justify-content: space-between;" slot="menu">
+		<button on:click|preventDefault={rollAll}>Roll all<DicesIcon /></button>
+		<!-- <button on:click|preventDefault={() => dispatch('begin', { initiatives })}>Begin!</button> -->
 	</div>
-</div>
-<div style="display: flex; justify-content: space-between;">
-	<button on:click={rollAll}>Roll all<DicesIcon /></button>
-	<button on:click={() => dispatch('begin', { initiatives })}>Begin!</button>
-</div>
+</Dialog>
 
 <style>
+	.icon-header {
+		display: flex;
+		gap: var(--size-3);
+		align-items: center;
+	}
 	* {
 		padding-block: var(--size-2);
 	}

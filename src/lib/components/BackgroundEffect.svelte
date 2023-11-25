@@ -6,18 +6,19 @@
 	// https://codepen.io/mikegolus/pen/Jegvym fireflies
 	// https://codepen.io/wikyware-net/pen/mdmOVjy smoke effect
 	// https://codepen.io/wikyware-net/pen/MWmQOGa smoke 2
+	export let n: number = 50;
 </script>
 
 <div class="container">
 	<!-- Quantity should be the same in Sass-->
-	{#each Array(15) as _}
+	{#each Array(n) as _}
 		<div class="firefly" />
 	{/each}
 </div>
 
 <style lang="sass">
 // Quantity should be the same in PUG
-$quantity: 15
+$quantity: 50
 
 .firefly
   position: fixed

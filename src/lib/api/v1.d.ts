@@ -476,23 +476,6 @@ export interface components {
       /** Path */
       path: string;
     };
-    /** ImageMatch */
-    ImageMatch: {
-      image: components["schemas"]["ImageURL"];
-      /** Image Id */
-      image_id: number;
-      /** Match Count */
-      match_count: number;
-      /** Tags */
-      tags: number[];
-    };
-    /** ImageMatchResult */
-    ImageMatchResult: {
-      /** Matches */
-      matches: components["schemas"]["ImageMatch"][];
-      /** Tags */
-      tags: number[];
-    };
     /**
      * ImageType
      * @enum {string}
@@ -1134,6 +1117,7 @@ export interface operations {
     parameters: {
       query?: {
         name?: string | null;
+        is_PC?: boolean | null;
         /** @description Page number */
         page?: number;
         /** @description Page size */
@@ -1404,6 +1388,7 @@ export interface operations {
   list_combats: {
     parameters: {
       query?: {
+        title?: string | null;
         /** @description Page number */
         page?: number;
         /** @description Page size */
@@ -1876,6 +1861,7 @@ export interface operations {
   list_images: {
     parameters: {
       query?: {
+        type?: components["schemas"]["ImageType"] | null;
         /** @description Page number */
         page?: number;
         /** @description Page size */
@@ -1931,13 +1917,18 @@ export interface operations {
     parameters: {
       query: {
         taglist: number[];
+        type?: components["schemas"]["ImageType"] | null;
+        /** @description Page number */
+        page?: number;
+        /** @description Page size */
+        size?: number;
       };
     };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["ImageMatchResult"];
+          "application/json": components["schemas"]["Page_ImageURL_"];
         };
       };
       /** @description Validation Error */

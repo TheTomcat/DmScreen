@@ -22,6 +22,7 @@ type Message = components['schemas']['Message'];
 type Tag = components['schemas']['Tag'];
 type Entity = components['schemas']['Entity'];
 type Participant = components['schemas']['Participant'];
+type ParticipantUpdate = components['schemas']['ParticipantUpdate'];
 type Combat = components['schemas']['Combat'];
 type Session = components['schemas']['Session'];
 // type = components['schemas'][''];

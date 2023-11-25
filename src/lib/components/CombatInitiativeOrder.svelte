@@ -1,5 +1,12 @@
 <script lang="ts">
-	import { sort_participants_naive, smartName, is_dead } from '$lib';
+	import {
+		sort_participants_naive,
+		smartName,
+		is_dead,
+		roll,
+		remainingHp,
+		remainingHpPercent
+	} from '$lib';
 	import { flip } from 'svelte/animate';
 	import {
 		CrossIcon,
@@ -17,22 +24,21 @@
 		SwordsIcon
 	} from 'lucide-svelte';
 	import type { components } from '$lib/api/v1';
+	import type { Participant, Entity, Combat } from '../../app';
+	import client from '$lib/api/index';
+	import { playerStateStore, combat } from '$lib/ws';
 
-	import {
-		combat,
-		setHasReaction,
-		setIsVisible,
-		setMaxHP,
-		state,
-		setDamage
-	} from '$lib/stores/combatStore';
 	import tippy from 'svelte-tippy';
 	import { onMount } from 'svelte';
 	import Modal from './Modal.svelte';
+	import type { wsController } from '$lib/ws';
+	import Autocomplete from './Autocomplete.svelte';
 
-	type Participant = components['schemas']['Participant'];
-	type Combat = components['schemas']['Combat'];
+	// type Participant = components['schemas']['Participant'];
+	// type Combat = components['schemas']['Combat'];
 	export let playerView: boolean = true;
+	export let controller: wsController;
+	export let manualUpdate: boolean = false;
 
 	let dialog: HTMLDialogElement;
 	let showModal: boolean = false;
@@ -41,25 +47,20 @@
 	let damageAmount: number = 0;
 	let damageInputField: HTMLInputElement;
 
-	const remainingHpPercent = (participant: Participant): number => {
-		if (participant.max_hp == undefined) return 100;
-		if (participant.damage == undefined) return 100;
-		return Math.round((100 * (participant.max_hp - participant.damage)) / participant.max_hp);
+	const getEntities = async (q: string) => {
+		return client.GET('/entity/', { params: { query: { name: q, size: 15 } } }).then((response) => {
+			if (!response.data) return [];
+			return response.data.items;
+		});
 	};
-	const remainingHp = (participant: Participant): number => {
-		if (participant.max_hp == undefined) return 100;
-		if (participant.damage == undefined) return 100;
-		return participant.max_hp - participant.damage;
+	const extractId = (t: Entity): number => t.entity_id;
+	const extractName = (t: Entity): string => t.name || '';
+	const addNewCombatant = (e: CustomEvent<Entity>) => {
+		console.log(e);
 	};
-
-	// onMount(() => {
-	// 	if (playerView) {
-	// 		console.log('loading');
-	// 		if (!combat_id) return;
-	// 		loadCombat(combat_id);
-	// 		console.log('loaded');
-	// 	}
-	// });
+	const addNewQuickCombatant = (e: CustomEvent<{ value: string }>) => {
+		console.log(e);
+	};
 </script>
 
 <table style="width: 100%; border-spacing: 0;">
@@ -72,7 +73,7 @@
 		<th><div class="icon"><Droplets color="red" /></div></th>
 	</thead>
 	<tbody>
-		{#if $state == 'ok' && $combat && $combat.participants}
+		{#if $combat && $combat.participants}
 			{#each $combat.participants //combat.participants
 				.filter((p) => p.is_visible || !playerView)
 				.toSorted(sort_participants_naive) as participant, i (participant.participant_id)}
@@ -96,7 +97,8 @@
 								<span
 									class="icon"
 									style="position: relative; right: 0;"
-									on:click={() => setIsVisible(participant.participant_id, !participant.is_visible)}
+									on:click={() =>
+										controller.setIsVisible(participant.participant_id, !participant.is_visible)}
 								>
 									{#if participant.is_visible}<Eye />{:else}<EyeOff />{/if}
 								</span>
@@ -104,7 +106,10 @@
 									class="icon"
 									style="position: relative; right: 0;"
 									on:click={() =>
-										setHasReaction(participant.participant_id, !participant.has_reaction)}
+										controller.setHasReaction(
+											participant.participant_id,
+											!participant.has_reaction
+										)}
 								>
 									{#if participant.has_reaction}<RefreshCw />{:else}<RefreshCwOff />{/if}
 								</span>
@@ -171,23 +176,48 @@
 					{:else}
 						<td
 							>{participant.max_hp}
-							<button on:click={() => setMaxHP(participant.participant_id, 1)}>One</button>
-							<button on:click={() => setMaxHP(participant.participant_id, 1)}>Min</button>
-							<button on:click={() => setMaxHP(participant.participant_id, 1)}>Avg</button>
-							<button on:click={() => setMaxHP(participant.participant_id, 1)}>Random</button>
-							<button on:click={() => setMaxHP(participant.participant_id, 1)}>Max</button>
+							<button on:click={() => controller.setMaxHP(participant.participant_id, 1)}
+								>One</button
+							>
+							<button on:click={() => controller.setMaxHP(participant.participant_id, 1)}
+								>Min</button
+							>
+							<button on:click={() => controller.setMaxHP(participant.participant_id, 1)}
+								>Avg</button
+							>
+							<button on:click={() => controller.setMaxHP(participant.participant_id, 1)}
+								>Random</button
+							>
+							<button on:click={() => controller.setMaxHP(participant.participant_id, 1)}
+								>Max</button
+							>
 						</td>
 					{/if}
 				</tr>
 			{/each}
 		{/if}
 	</tbody>
+	<tfoot>
+		<tr
+			><td colspan="3">Add Combatant</td>
+			<td colspan="2"
+				><Autocomplete
+					getData={getEntities}
+					{extractId}
+					{extractName}
+					on:submititem={addNewCombatant}
+					on:submitnew={addNewQuickCombatant}
+					allowCreation={false}
+					placeholder={'Search for a Combatant'}
+				/></td
+			>
+			<td><button><PlusSquare />Quick-add combatant</button></td>
+		</tr>
+	</tfoot>
 </table>
-<div>
-	{#if !playerView}
-		<button><PlusSquare />Add combatant</button>
-	{/if}
-</div>
+<!-- <div>
+	{#if !playerView}{/if}
+</div> -->
 {#if !playerView}
 	<Modal bind:dialog bind:showModal params={{ allowCasualDismiss: true, showClose: false }}>
 		{#if damaging_participant && damaging_participant.participant_id}
@@ -202,7 +232,7 @@
 						let damage = (damaging ? 1 : -1) * damageAmount + (damaging_participant?.damage || 0);
 						if (damage > damaging_participant.max_hp) damage = damaging_participant.max_hp;
 						if (damage < 0) damage = 0;
-						setDamage(damaging_participant?.participant_id, damage);
+						controller.setDamage(damaging_participant?.participant_id, damage);
 					}
 					dialog.close();
 				}}>{`Apply ${damaging ? 'damage' : 'healing'}`}</button

@@ -1,9 +1,14 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { createEventDispatcher, onDestroy, onMount } from 'svelte';
 
 	import client from '$lib/api/index';
 	import type { ImageURL } from '../../app';
 	import { browser } from '$app/environment';
+
+	const dispatch = createEventDispatcher<{
+		changing: { image_id: number };
+		changed: { image_id: number };
+	}>();
 
 	export let image_id: number | undefined = undefined;
 	export let cycleImage: boolean = false;
@@ -14,6 +19,8 @@
 	let imageBox: HTMLDivElement;
 	let is_transitioning: boolean = false;
 
+	let timeoutID: number | undefined;
+
 	$: {
 		if (browser) {
 			if (image_id != previous_image_id) {
@@ -22,17 +29,33 @@
 		}
 	}
 
+	onDestroy(() => {
+		clearTimeout(timeoutID);
+	});
+
+	$: {
+		if (!cycleImage) {
+			console.log('clearing');
+			clearTimeout(timeoutID);
+			timeoutID = undefined;
+		} else if (cycleImage && !timeoutID) {
+			console.log('scheduling');
+			schedulePageUpdate(cycleImageTimeout);
+		}
+	}
+
 	const schedulePageUpdate = (timer = cycleImageTimeout) => {
-		setTimeout(() => {
+		timeoutID = setTimeout(() => {
 			fetchImageDataAndDisplayImage();
 			schedulePageUpdate(timer);
 		}, timer);
 	};
-	if (cycleImage) {
-		onMount(() => {
-			schedulePageUpdate();
-		});
-	}
+	// if (cycleImage) {
+	// 	console.log('Scheduling update');
+	// 	onMount(() => {
+	// 		schedulePageUpdate();
+	// 	});
+	// }
 
 	const fetchImageDataAndDisplayImage = (image_id: number | undefined = undefined) => {
 		getImageData(image_id).then((response) => {
@@ -44,10 +67,12 @@
 			if (response.data) {
 				imageData = response.data;
 				previous_image_id = image_id;
+				dispatch('changing', { image_id: response.data.image_id });
 				preloadImage(imageData.url, (e: Event) => {
 					is_transitioning = true;
 					setTimeout(() => {
-						if (imageData) {
+						if (imageData && imageBox) {
+							dispatch('changed', { image_id: response.data.image_id });
 							imageBox.style.backgroundImage = `url(/api/${imageData.url})`;
 							is_transitioning = false;
 						}

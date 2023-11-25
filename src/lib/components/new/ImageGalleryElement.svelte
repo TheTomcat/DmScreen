@@ -7,11 +7,13 @@
 	type Image = components['schemas']['ImageURL'];
 
 	export let image: Image | null;
+	export let clickAction = (e: Image | null) => {};
 	let state: 'loading' | 'error' | 'done' = 'done';
 </script>
 
 {#if image}
-	<div class="container">
+	<div class="gallery-item">
+		<h3 class="heading">{image.name}</h3>
 		<div class="image">
 			{#if state === 'loading'}
 				<div class="loading" />
@@ -22,19 +24,19 @@
 					alt={image.name}
 					width={image.dimension_x}
 					height={image.dimension_y}
+					on:click={() => clickAction(image)}
 				/>
 			{/if}
 		</div>
 		<div class="information">
-			<h3>{image.name}</h3>
-			{capitalise(image.type || 'undefined')}
-
 			<div class="tags">
 				{#each image.tags as tag (tag.tag_id)}
 					<ImageTag {tag} interactive={false} />
 				{/each}
 			</div>
-			<div class="imid">{image.dimension_x}x{image.dimension_y} - {image.image_id}</div>
+			<div class="imid">
+				{capitalise(image.type || 'undefined')}: {image.dimension_x}x{image.dimension_y} - {image.image_id}
+			</div>
 			<div class="palette">
 				{#if image.palette}
 					{#each image.palette.split(',') as colour}
@@ -61,18 +63,32 @@
 		border: solid 1px var(--text-2);
 		box-shadow: var(--shadow-2);
 	}
-	.container {
-		max-width: 800px;
+	.palette {
+		display: flex;
+	}
+	.gallery-item {
+		/* max-width: 800px; */
 		margin: auto;
 		padding: var(--size-3);
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		grid-template-areas:
+			'title title'
+			'image details';
 	}
 	.heading {
 		padding-block: var(--size-3);
 		grid-area: title;
-		display: flex;
+		/* display: flex;
 		flex-direction: row;
 		justify-content: space-between;
-		align-items: baseline;
+		align-items: baseline; */
+	}
+	.image {
+		grid-area: image;
+	}
+	.information {
+		grid-area: details;
 	}
 	.imid {
 		padding-block: var(--size-3);

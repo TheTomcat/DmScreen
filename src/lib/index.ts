@@ -101,6 +101,30 @@ export const get_next_PC = (current_participant_id: number, participants: Partic
     return get_next_participant_id(current_participant_id, PCs)
 }
 
+export const remainingHpPercent = (participant: Participant): number => {
+    if (participant.max_hp == undefined) return 100;
+    if (participant.damage == undefined) return 100;
+    return Math.round((100 * (participant.max_hp - participant.damage)) / participant.max_hp);
+};
+export const remainingHp = (participant: Participant): number => {
+    if (participant.max_hp == undefined) return 100;
+    if (participant.damage == undefined) return 100;
+    return participant.max_hp - participant.damage;
+};
+
+export const describeHealth = (participant: Participant): string => {
+    let health = remainingHpPercent(participant);
+    const statuses: { [hp: number]: string } = {
+        100: 'Untouched',
+        75: 'Battered',
+        50: 'Bloodied',
+        25: 'Critically injured',
+        5: 'Death\'s door'
+    }
+    let result = Object.entries(statuses).find(([hp, desc]) => (parseInt(hp) <= health))
+    return result ? result[1] : statuses[100];
+}
+
 export const smartName = (current_participant_id: number, participants: Participant[]): string => {
     let name = participants.find(p => p.participant_id == current_participant_id)?.name;
     if (!name) return "";

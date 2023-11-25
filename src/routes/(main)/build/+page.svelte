@@ -5,14 +5,18 @@
 	import InputBox from '$lib/components/InputBox.svelte';
 	import type { Entity, Participant, Combat } from '../../../app';
 
-	import { Edit, Minus, Plus, PlusSquare, X } from 'lucide-svelte';
-	import { apiAddParticipantToCombat, apiCreateCombat } from '$lib/api';
+	import { Edit, Info, Minus, Plus, PlusSquare, X } from 'lucide-svelte';
+
 	import { debounce, roll } from '$lib';
 	import { flip } from 'svelte/animate';
 	import Modal from '$lib/components/Modal.svelte';
 	import EntityBox from '$lib/components/EntityBox.svelte';
 	import client from '$lib/api/index';
 	import { toast } from '@zerodevx/svelte-toast';
+	import Dialog from '$lib/components/Dialog.svelte';
+	import EntityEdit from '$lib/components/EntityEdit.svelte';
+	import { browser } from '$app/environment';
+
 	// import { loading } from '../../../../lib/stores/combatStore';
 
 	//https://svelte.dev/repl/6fbaf2115a31423b9e5b989423dce38a?version=3.42.5 Shake animation
@@ -22,65 +26,90 @@
 	let loadingMoreEntities: boolean = false;
 	let filteredEntities: Entity[] = [];
 	let numResults: number = -1;
-	let nextPage: number = -1;
+	let nextPage: number = 1;
+	let currentPage: number = 1;
+	let numPages: number = 1;
 	let showPCs: boolean = false;
 	let showNPCs: boolean = true;
 	let title: string;
 	let useSmartNaming: boolean = false;
 
 	let entityListDiv: HTMLElement;
+	let miniDialog: Dialog;
+	let quickCreateDialog: Dialog;
+	type QuickEntity = {
+		name: string;
+		initiative: number;
+		ac: number;
+		hit_points: number;
+		entity_id: number;
+		cr: undefined;
+	};
+	let quickEntityId = -1;
+	let quickEntity: QuickEntity = {
+		name: '',
+		initiative: 10,
+		ac: 10,
+		hit_points: 1,
+		entity_id: -1,
+		cr: undefined
+	};
 
-	let combatants: { entity: Entity; count: number }[] = [];
+	let combatants: { entity: Entity | QuickEntity; count: number }[] = [];
 
 	let flipDurationMs: number = 200;
 
-	const getEntities = async (q: string, page: number = 1) => {
+	const getEntities = async (page: number = 1) => {
+		// console.log('Getting ', { name: entityFilter, page, is_PC: showPCs });
 		return client.GET('/entity/', {
 			params: {
-				query: { name: q, page }
+				query: { name: entityFilter, page, is_PC: showPCs }
 			}
 		});
 	};
 
-	const _updateList = (search: string, page: number = 1, cb: Function) => {
-		getEntities(search, page).then((response) => {
-			if (!response.data) return;
-			let isNextPage =
-				(response.data?.page || 0) * (response.data?.size || 0) < (response.data?.total || 0);
-			cb(response.data?.items, response.data?.total, isNextPage);
-		});
+	type EntitiesResponse = Awaited<ReturnType<typeof getEntities>> | undefined;
+
+	const handleResponse = (response: EntitiesResponse) => {
+		if (!response || !response.data) return;
+		currentPage = response.data.page || 1;
+		numPages = response.data.pages || 1;
+		numResults = response.data.total || -1;
+		nextPage =
+			(response.data.page || 1) < (response.data.pages || 1) ? (response.data.page || 1) + 1 : -1;
+		if (response.data.page == 1) {
+			filteredEntities = [...response.data.items];
+			loadingEntities = false;
+		} else {
+			filteredEntities = [...filteredEntities, ...response.data.items];
+			loadingMoreEntities = false;
+		}
 	};
 
-	const updateList = debounce(_updateList, 200);
+	const _loadFirstPage = async () => {
+		getEntities().then(handleResponse);
+	};
+
+	const loadFirstPage = debounce(_loadFirstPage, 200);
+
+	const loadNextPage = async () => {
+		if (loadingMoreEntities) return;
+		if (nextPage < 0) return;
+		loadingMoreEntities = true;
+		getEntities(nextPage).then(handleResponse);
+	};
 
 	$: {
-		if (entityFilter) {
+		if (browser) {
+			entityFilter && showPCs; //to trigger reactivity
 			loadingEntities = true;
-			updateList(entityFilter, 1, (entities: Entity[], results: number, isNextPage: boolean) => {
-				filteredEntities = entities;
-				numResults = results;
-				loadingEntities = false;
-				nextPage = isNextPage ? 2 : -1;
-			});
-		} else {
-			filteredEntities = [];
+			loadFirstPage();
 		}
 	}
 
-	let handleScroll = (e: Event) => {
+	let handleScroll = async (e: Event) => {
 		if (entityListDiv.scrollTop + entityListDiv.clientHeight == entityListDiv.scrollHeight) {
-			loadingMoreEntities = true;
-			if (nextPage < 0) return;
-			_updateList(
-				entityFilter,
-				nextPage,
-				(entities: Entity[], results: number, isNextPage: boolean) => {
-					filteredEntities = [...filteredEntities, ...entities];
-					numResults += results;
-					loadingMoreEntities = false;
-					nextPage = isNextPage ? nextPage + 1 : -1;
-				}
-			);
+			await loadNextPage();
 		}
 	};
 
@@ -100,6 +129,18 @@
 		}
 		return () => {
 			combatants = [...combatants, { entity, count: 1 }];
+		};
+	};
+
+	let quickAddCombatant = (combatant: QuickEntity) => {
+		return () => {
+			combatants = [
+				...combatants,
+				{ entity: { ...combatant, entity_id: quickEntityId }, count: 1 }
+			];
+			quickEntityId--;
+			// TODO: Implement quick add
+			// TODO: ?? get rid of the array combatants, and just make it a list?
 		};
 	};
 
@@ -138,6 +179,15 @@
 					participants: combatants
 						.map(({ entity, count }) =>
 							Array.from(Array(count).keys()).map((i) => {
+								if ('hit_points' in entity) {
+									return {
+										name: entity.name,
+										max_hp: entity.hit_points,
+										ac: entity.ac,
+										initiative: entity.initiative,
+										is_PC: false
+									};
+								}
 								return {
 									name: entity.name,
 									//useSmartNaming && count > 1
@@ -153,7 +203,7 @@
 								};
 							})
 						)
-						.reduce((a, b) => a.concat(b))
+						.reduce((a, b) => a.concat(b)) // Flatten the array
 				}
 			})
 			.then((response) => {
@@ -164,8 +214,40 @@
 				}
 			});
 	};
+
+	const handleUpdate = (e: CustomEvent<{ returnValue: string }>) => {
+		if (e.detail.returnValue == 'confirm') {
+			quickAddCombatant(quickEntity)();
+		}
+	};
 </script>
 
+<Dialog mode="mega" bind:this={miniDialog} on:closed={handleUpdate}>
+	<section slot="header">
+		<h2>Edit Entity</h2>
+	</section>
+	<svelte:fragment slot="content">
+		<EntityEdit />
+	</svelte:fragment>
+</Dialog>
+<Dialog mode="mega" bind:this={quickCreateDialog} on:closed={handleUpdate}>
+	<section slot="header">
+		<h2>Quick Create Combatant</h2>
+	</section>
+	<svelte:fragment slot="content">
+		Create a combatant using the absolute minimum data. No frills!
+		<div style="display: grid; grid-template-columns: auto 1fr;">
+			<label for="name">Name</label>
+			<input id="name" bind:value={quickEntity.name} />
+			<label for="ac">AC</label>
+			<input id="ac" bind:value={quickEntity.ac} />
+			<label for="hp">HP</label>
+			<input id="hp" bind:value={quickEntity.hit_points} />
+			<label for="init">Initiative</label>
+			<input id="init" bind:value={quickEntity.initiative} />
+		</div>
+	</svelte:fragment>
+</Dialog>
 <!-- {@debug combatants} -->
 <h1>Combat Builder</h1>
 <div>
@@ -178,11 +260,18 @@
 <div class="container">
 	<div class="entities">
 		<div class="header">
-			<h4>Add a monster:</h4>
-			<InputBox bind:value={entityFilter} placeholder={'Filter...'} />
-			Show:<button class:selected={showPCs} on:click={() => (showPCs = !showPCs)}>{'PCs'}</button>
-			<button class:selected={showNPCs} on:click={() => (showNPCs = !showNPCs)}>{'NPCs'}</button>
-			{numResults >= 0 ? `${numResults} results` : ''}
+			<div style="display: flex; justify-content: space-between;">
+				<h4>Add a monster:</h4>
+				<button on:click={() => quickCreateDialog.open()}><PlusSquare /> Quick Add</button>
+			</div>
+			<div style="display: flex; justify-content: space-between; align-items: center;">
+				<InputBox bind:value={entityFilter} placeholder={'Filter...'} />
+				<button class:selected={showPCs} on:click={() => (showPCs = !showPCs)}>{'PCs'}</button>
+				<button class:selected={!showPCs} on:click={() => (showPCs = !showPCs)}>{'NPCs'}</button>
+			</div>
+			<p>
+				{numResults >= 0 ? `${filteredEntities.length} of ${numResults} results` : ''}
+			</p>
 		</div>
 		{#if filteredEntities}
 			<div class="entitylist" bind:this={entityListDiv} on:scroll={handleScroll}>
@@ -193,6 +282,8 @@
 						<EntityRow {entity}>
 							<button on:click={addCombatant(entity)}><PlusSquare /></button>
 						</EntityRow>
+					{:else}
+						No entities.
 					{/each}
 					{#if loadingMoreEntities}
 						loading...
@@ -264,6 +355,12 @@
 <!-- <EntityBox bind:dialogVisible bind:this={entitybox} /> -->
 
 <style>
+	.information {
+		display: grid;
+		grid-template-columns: var(--size-fluid-3) 1fr;
+		gap: var(--size-3);
+		align-items: center;
+	}
 	.container {
 		display: grid;
 		grid-template-columns: 1fr 2fr;
@@ -282,7 +379,7 @@
 	.entitylist {
 		/* overflow: scroll; */
 		padding: var(--size-3);
-		max-height: 70vh;
+		max-height: 45vh;
 		overflow-y: scroll;
 	}
 	.description {
