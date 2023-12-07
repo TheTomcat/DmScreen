@@ -24,7 +24,7 @@
 		SwordsIcon
 	} from 'lucide-svelte';
 	import type { components } from '$lib/api/v1';
-	import type { Participant, Entity, Combat } from '../../app';
+	import type { Participant, Entity, Combat, RollMode } from '../../app';
 	import client from '$lib/api/index';
 	import { playerStateStore, combat } from '$lib/ws';
 
@@ -67,7 +67,7 @@
 	<thead>
 		<th><div class="icon"><Dices /></div></th>
 		<th />
-		{#if !playerView}<th />{/if}
+		<th />
 		<th>Name</th>
 		<th />
 		<th><div class="icon"><Droplets color="red" /></div></th>
@@ -75,7 +75,7 @@
 	<tbody>
 		{#if $combat && $combat.participants}
 			{#each $combat.participants //combat.participants
-				.filter((p) => p.is_visible || !playerView)
+				//.filter((p) => p.is_visible || !playerView)
 				.toSorted(sort_participants_naive) as participant, i (participant.participant_id)}
 				<tr
 					animate:flip
@@ -91,31 +91,28 @@
 							/>
 						</div>
 					</td>
-					{#if !playerView}
-						<td
-							><div style="display: flex; flex-direction: row; justify-content: center;">
-								<span
-									class="icon"
-									style="position: relative; right: 0;"
-									on:click={() =>
-										controller.setIsVisible(participant.participant_id, !participant.is_visible)}
-								>
-									{#if participant.is_visible}<Eye />{:else}<EyeOff />{/if}
-								</span>
-								<span
-									class="icon"
-									style="position: relative; right: 0;"
-									on:click={() =>
-										controller.setHasReaction(
-											participant.participant_id,
-											!participant.has_reaction
-										)}
-								>
-									{#if participant.has_reaction}<RefreshCw />{:else}<RefreshCwOff />{/if}
-								</span>
-							</div>
-						</td>
-					{/if}
+
+					<td
+						><div style="display: flex; flex-direction: row; justify-content: center;">
+							<span
+								class="icon"
+								style="position: relative; right: 0;"
+								on:click={() =>
+									controller.setIsVisible(participant.participant_id, !participant.is_visible)}
+							>
+								{#if participant.is_visible}<Eye />{:else}<EyeOff />{/if}
+							</span>
+							<span
+								class="icon"
+								style="position: relative; right: 0;"
+								on:click={() =>
+									controller.setHasReaction(participant.participant_id, !participant.has_reaction)}
+							>
+								{#if participant.has_reaction}<RefreshCw />{:else}<RefreshCwOff />{/if}
+							</span>
+						</div>
+					</td>
+
 					<td>
 						<!-- {#if playerView} -->
 						<span class:dead={is_dead(participant)} class:player={participant.is_PC}>
@@ -132,67 +129,47 @@
 						><div style="display:flex; justify-content: end; gap: var(--size-3)">
 							{#if is_dead(participant)}<div class="icon">
 									<Skull />
-								</div>{/if}{#each participant.conditions.split(',') as condition}{condition}{/each}
-							{#if playerView}
+								</div>
+							{/if}
+							{#each participant.conditions.split(',') as condition}{condition}{/each}
+							<!-- {#if playerView}
 								<span class="icon" style="position: relative; right: 0;">
 									{#if participant.has_reaction}<RefreshCw />{:else}<RefreshCwOff />{/if}
 								</span>
-							{/if}
+							{/if} -->
 						</div>
 					</td>
-					{#if playerView}
-						<td>{participant.damage}</td>
-					{:else if $combat.is_active}
-						<td
-							><div class="damage">
-								<button
-									on:click={() => {
-										damaging = true;
-										damageAmount = 0;
-										damaging_participant = participant;
-										showModal = true;
-									}}
-								>
-									<SwordsIcon color={'red'} />
-								</button>
-								<div class="hitpoints">
-									{remainingHp(participant)}/{participant.max_hp}
-									<span class="fullhp">
-										<span class="remaininghp" style="width: {remainingHpPercent(participant)}%" />
-									</span>
-								</div>
-								<button
-									on:click={() => {
-										damaging = false;
-										damageAmount = 0;
-										damaging_participant = participant;
-										showModal = true;
-									}}
-								>
-									<CrossIcon color={'green'} />
-								</button>
+
+					<td
+						><div class="damage">
+							<button
+								on:click={() => {
+									damaging = true;
+									damageAmount = 0;
+									damaging_participant = participant;
+									showModal = true;
+								}}
+							>
+								<SwordsIcon color={'red'} />
+							</button>
+							<div class="hitpoints">
+								{remainingHp(participant)}/{participant.max_hp}
+								<span class="fullhp">
+									<span class="remaininghp" style="width: {remainingHpPercent(participant)}%" />
+								</span>
 							</div>
-						</td>
-					{:else}
-						<td
-							>{participant.max_hp}
-							<button on:click={() => controller.setMaxHP(participant.participant_id, 1)}
-								>One</button
+							<button
+								on:click={() => {
+									damaging = false;
+									damageAmount = 0;
+									damaging_participant = participant;
+									showModal = true;
+								}}
 							>
-							<button on:click={() => controller.setMaxHP(participant.participant_id, 1)}
-								>Min</button
-							>
-							<button on:click={() => controller.setMaxHP(participant.participant_id, 1)}
-								>Avg</button
-							>
-							<button on:click={() => controller.setMaxHP(participant.participant_id, 1)}
-								>Random</button
-							>
-							<button on:click={() => controller.setMaxHP(participant.participant_id, 1)}
-								>Max</button
-							>
-						</td>
-					{/if}
+								<CrossIcon color={'green'} />
+							</button>
+						</div>
+					</td>
 				</tr>
 			{/each}
 		{/if}
@@ -218,28 +195,27 @@
 <!-- <div>
 	{#if !playerView}{/if}
 </div> -->
-{#if !playerView}
-	<Modal bind:dialog bind:showModal params={{ allowCasualDismiss: true, showClose: false }}>
-		{#if damaging_participant && damaging_participant.participant_id}
-			<h5>Apply {`${damaging ? 'damage' : 'healing'}`} to {damaging_participant.name}</h5>
-			<input
-				placeholder={`Apply ${damaging ? 'damage' : 'healing'}`}
-				bind:value={damageAmount}
-				bind:this={damageInputField}
-			/><button
-				on:click={() => {
-					if (damageAmount != 0) {
-						let damage = (damaging ? 1 : -1) * damageAmount + (damaging_participant?.damage || 0);
-						if (damage > damaging_participant.max_hp) damage = damaging_participant.max_hp;
-						if (damage < 0) damage = 0;
-						controller.setDamage(damaging_participant?.participant_id, damage);
-					}
-					dialog.close();
-				}}>{`Apply ${damaging ? 'damage' : 'healing'}`}</button
-			>
-		{/if}
-	</Modal>
-{/if}
+
+<Modal bind:dialog bind:showModal params={{ allowCasualDismiss: true, showClose: false }}>
+	{#if damaging_participant && damaging_participant.participant_id}
+		<h5>Apply {`${damaging ? 'damage' : 'healing'}`} to {damaging_participant.name}</h5>
+		<input
+			placeholder={`Apply ${damaging ? 'damage' : 'healing'}`}
+			bind:value={damageAmount}
+			bind:this={damageInputField}
+		/><button
+			on:click={() => {
+				if (damageAmount != 0) {
+					let damage = (damaging ? 1 : -1) * damageAmount + (damaging_participant?.damage || 0);
+					if (damage > damaging_participant.max_hp) damage = damaging_participant.max_hp;
+					if (damage < 0) damage = 0;
+					controller.setDamage(damaging_participant?.participant_id, damage);
+				}
+				dialog.close();
+			}}>{`Apply ${damaging ? 'damage' : 'healing'}`}</button
+		>
+	{/if}
+</Modal>
 
 <!-- <Modal bind:damageDialog bind:showDamageModal params={{ allowCasualDismiss: true, showClose: false }} /> -->
 

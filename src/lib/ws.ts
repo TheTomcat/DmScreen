@@ -15,9 +15,12 @@ type wsEventType = "changeMode"
     | "setLoadingMessage"
     | "announce"
     | "clearAnnouncement"
-    | "setBackgroundImageCycle"
+    | "showSpinner"
     | "provideStatus"
     | "requestStatus"
+    | "notifyBackgroundImage"
+    | "notifyMessage"
+
 export type wsPlayerMode = "loading" | "backdrop" | "combat" | "handout" | "map" | "idle";
 type wsEventChangeMode = {
     event: 'changeMode'
@@ -42,21 +45,33 @@ type wsEventSetBackgroundImage = {
     event: 'setBackgroundImage'
     display: boolean
     image_id: number | undefined
-    background_image_timeout: number | undefined
+    timeout: number | undefined
+    cycle: boolean
 }
 type wsEventSetLoadingMessage = {
     event: 'setLoadingMessage'
     display: boolean
     message_id: number | undefined
+    timeout: number | undefined
+    cycle: boolean
 }
 type wsEventAnnounce = {
     event: 'announce' | 'clearAnnouncement'
     message: string
     timeout: number
+    display: boolean
 }
-type wsEventSetBackgroundImageCycle = {
-    event: 'setBackgroundImageCycle'
-    cycle: boolean
+type wsEventClearAnnouncement = {
+    event: 'clearAnnouncement'
+}
+type wsEventSetHandout = {
+    event: 'setHandout'
+    display: boolean
+    handout_id: number | undefined
+}
+type wsEventShowSpinner = {
+    event: 'showSpinner'
+    display: boolean
 }
 type wsEventRequestStatus = {
     event: 'requestStatus'
@@ -65,6 +80,15 @@ type wsEventProvideStatus = {
     event: 'provideStatus'
     state: playerState
 }
+type wsEventNotifyBackgroundImage = {
+    event: 'notifyBackgroundImage'
+    image_id: number;
+}
+type wsEventNotifyMessage = {
+    event: 'notifyMessage'
+    message_id: number;
+}
+
 type event = {
     event: wsEventType
 }
@@ -74,14 +98,19 @@ type event = {
 export type playerState = {
     mode: wsPlayerMode
     combat: Combat | undefined
+    combat_display: boolean
     background_image_id: number | undefined
     background_image_timeout: number
     background_image_display: boolean
     background_image_cycle: boolean
+    spinner_display: boolean
     message_id: number | undefined
+    message_timeout: number
     message_display: boolean
+    message_cycle: boolean
     announce_text: string | undefined
     announce_timeout: number
+    announce_display: boolean
 }
 
 export type wsEvent = wsEventChangeMode
@@ -92,9 +121,13 @@ export type wsEvent = wsEventChangeMode
     | wsEventSetBackgroundImage
     | wsEventSetLoadingMessage
     | wsEventAnnounce
-    | wsEventSetBackgroundImageCycle
+    | wsEventClearAnnouncement
+    | wsEventShowSpinner
+    // | wsEventSetBackgroundImageCycle
     | wsEventProvideStatus
-    | wsEventRequestStatus;
+    | wsEventRequestStatus
+    | wsEventNotifyBackgroundImage
+    | wsEventNotifyMessage;
 
 export const playerStateStore = writable<playerState>();
 export const combat = derived(playerStateStore, ($playerStateStore) => {
@@ -102,24 +135,36 @@ export const combat = derived(playerStateStore, ($playerStateStore) => {
         return $playerStateStore.combat;
     return undefined
 });
+export const activeParticipant = derived(playerStateStore, ($playerStateStore) => {
+    if ($playerStateStore && $playerStateStore.combat)
+        return $playerStateStore.combat.participants.find(p => p.participant_id == $playerStateStore.combat?.active_participant_id);
+    return undefined
+})
+
+
 
 export const initialise = () => {
     playerStateStore.set({
         mode: 'backdrop',
         combat: undefined,
+        combat_display: false,
         background_image_id: undefined,
         background_image_timeout: 30000,
         background_image_display: true,
+        background_image_cycle: true,
+        spinner_display: false,
         message_id: undefined,
         message_display: false,
+        message_cycle: true,
+        message_timeout: 30000,
         announce_text: undefined,
         announce_timeout: 10000,
-        background_image_cycle: true
+        announce_display: false,
     })
 }
 
-export const handleMessageEvent = (e: MessageEvent<string>) => {
-    handleWSEvent(JSON.parse(e.data) as wsEvent)
+export const handleMessageEvent = (e: MessageEvent<string>) => { //, isClient: boolean) => {
+    handleWSEvent(JSON.parse(e.data) as wsEvent) //, isClient)
 }
 /**
  * This is the handler function for both the client and the controller,
@@ -127,14 +172,16 @@ export const handleMessageEvent = (e: MessageEvent<string>) => {
  * on both the client (upon recieving the message) and the controller (after sending)
  * @param e wsEvent
  */
-const handleWSEvent = (e: wsEvent) => {
+const handleWSEvent = (e: wsEvent) => { //, isClient: boolean = false) => {
     switch (e.event) {
         case 'changeMode':
             playerStateStore.update(makeChangeMode(e))
             break;
         case "beginCombat":
+            playerStateStore.update(makeBeginCombat(e))
+            break;
         case "updateCombat":
-            playerStateStore.update(makeSetCombat(e))
+            playerStateStore.update(makeUpdateCombat(e))
             break;
         case "advanceCombat":
             playerStateStore.update(makeAdvanceCombat(e))
@@ -145,8 +192,16 @@ const handleWSEvent = (e: wsEvent) => {
         case "setBackgroundImage":
             playerStateStore.update(makeSetBackgroundImage(e))
             break;
-        case "setBackgroundImageCycle":
-            playerStateStore.update(makeSetBackgroundImageCycle(e))
+        case "notifyBackgroundImage":
+            // if (isClient) return
+            playerStateStore.update(makeNotifyBackgroundImage(e))
+            break;
+        case "notifyMessage":
+            // if (isClient) return
+            playerStateStore.update(makeNotifyMessage(e))
+            break;
+        case "showSpinner":
+            playerStateStore.update(makeShowSpinner(e))
             break;
         case "setLoadingMessage":
             playerStateStore.update(makeSetLoadingMessage(e))
@@ -159,8 +214,8 @@ const handleWSEvent = (e: wsEvent) => {
             break;
         case "announce":
             playerStateStore.update(makeAnnounce(e))
+            clearInterval(annoucementTimerId);
             if (e.timeout > 0) {
-                clearInterval(annoucementTimerId);
                 console.log(`scheduling update for ${e.timeout}`)
                 annoucementTimerId = setInterval(() => playerStateStore.update(clearAnnounce), e.timeout)
             }
@@ -178,7 +233,11 @@ const handleWSEvent = (e: wsEvent) => {
 const makeSetLoadingMessage = (data: wsEventSetLoadingMessage) => {
     let setLoadingMessage = (playerState: playerState): playerState => {
         return {
-            ...playerState, message_id: data.message_id, message_display: data.display
+            ...playerState,
+            message_id: data.message_id,
+            message_display: data.display,
+            message_cycle: data.cycle,
+            message_timeout: data.timeout || 30000
         }
     }
     return setLoadingMessage
@@ -186,19 +245,50 @@ const makeSetLoadingMessage = (data: wsEventSetLoadingMessage) => {
 const makeSetBackgroundImage = (data: wsEventSetBackgroundImage) => {
     let setBackgroundImage = (playerState: playerState): playerState => {
         return {
-            ...playerState, background_image_id: data.image_id, background_image_display: data.display, background_image_timeout: data.background_image_timeout || 30000
+            ...playerState,
+            background_image_id: data.image_id,
+            background_image_display: data.display,
+            background_image_timeout: data.timeout || 30000,
+            background_image_cycle: data.cycle,
         }
     }
     return setBackgroundImage
 }
-const makeSetBackgroundImageCycle = (data: wsEventSetBackgroundImageCycle) => {
-    let setBackgroundImageCycle = (playerState: playerState): playerState => {
+const makeNotifyBackgroundImage = (data: wsEventNotifyBackgroundImage) => {
+    let notifyBackgroundImage = (playerState: playerState): playerState => {
         return {
-            ...playerState, background_image_cycle: data.cycle
+            ...playerState,
+            background_image_id: data.image_id
         }
     }
-    return setBackgroundImageCycle
+    return notifyBackgroundImage
 }
+const makeNotifyMessage = (data: wsEventNotifyMessage) => {
+    let notifyBackgroundImage = (playerState: playerState): playerState => {
+        return {
+            ...playerState,
+            message_id: data.message_id
+        }
+    }
+    return notifyBackgroundImage
+}
+const makeShowSpinner = (data: wsEventShowSpinner) => {
+    let showSpinner = (playerState: playerState): playerState => {
+        return {
+            ...playerState,
+            spinner_display: data.display
+        }
+    }
+    return showSpinner
+}
+// const makeSetBackgroundImageCycle = (data: wsEventSetBackgroundImageCycle) => {
+//     let setBackgroundImageCycle = (playerState: playerState): playerState => {
+//         return {
+//             ...playerState, background_image_cycle: data.cycle
+//         }
+//     }
+//     return setBackgroundImageCycle
+// }
 const makeChangeMode = (data: wsEventChangeMode) => {
     let changeMode = (playerState: playerState): playerState => {
         return {
@@ -210,17 +300,25 @@ const makeChangeMode = (data: wsEventChangeMode) => {
 const makeAnnounce = (data: wsEventAnnounce) => {
     let announce = (playerState: playerState): playerState => {
         return {
-            ...playerState, announce_text: data.message, announce_timeout: data.timeout
+            ...playerState, announce_text: data.message, announce_timeout: data.timeout, announce_display: true
         }
     }
     return announce
 }
 export const clearAnnounce = (playerState: playerState): playerState => {
     return {
-        ...playerState, announce_text: undefined, announce_timeout: 10000
+        ...playerState, announce_display: false //announce_text: undefined, announce_timeout: 10000
     }
 }
-const makeSetCombat = (data: wsEventBeginCombat | wsEventUpdateCombat) => {
+const makeBeginCombat = (data: wsEventBeginCombat | wsEventUpdateCombat) => {
+    let setCombat = (playerState: playerState): playerState => {
+        return {
+            ...playerState, combat: data.combat, combat_display: true
+        }
+    }
+    return setCombat
+}
+const makeUpdateCombat = (data: wsEventBeginCombat | wsEventUpdateCombat) => {
     let setCombat = (playerState: playerState): playerState => {
         return {
             ...playerState, combat: data.combat
@@ -329,11 +427,16 @@ export class wsController {
         handleWSEvent(event)
 
     }
-    setBackgroundImageCycle({ ...e }: Omit<wsEventSetBackgroundImageCycle, 'event'>) {
-        let event: wsEventSetBackgroundImageCycle = { ...e, event: 'setBackgroundImageCycle' }
+    showSpinner({ ...e }: Omit<wsEventShowSpinner, 'event'>) {
+        let event: wsEventShowSpinner = { ...e, event: 'showSpinner' }
         this.ws.send(JSON.stringify(event))
         handleWSEvent(event)
     }
+    // setBackgroundImageCycle({ ...e }: Omit<wsEventSetBackgroundImageCycle, 'event'>) {
+    //     let event: wsEventSetBackgroundImageCycle = { ...e, event: 'setBackgroundImageCycle' }
+    //     this.ws.send(JSON.stringify(event))
+    //     handleWSEvent(event)
+    // }
     changeMode({ ...e }: Omit<wsEventChangeMode, 'event'>) {
         let event: wsEventChangeMode = { ...e, event: 'changeMode' }
         this.ws.send(JSON.stringify(event))
@@ -345,7 +448,7 @@ export class wsController {
         handleWSEvent(event)
     }
     clearAnnouncement() {
-        let event: wsEventAnnounce = { message: '', timeout: 0, event: 'announce' }
+        let event: wsEventClearAnnouncement = { event: 'clearAnnouncement' };
         this.ws.send(JSON.stringify(event))
         handleWSEvent(event)
     }
@@ -368,6 +471,14 @@ export class wsController {
         let event: wsEventSuspendCombat = { event: 'suspendCombat' }
         this.ws.send(JSON.stringify(event))
         handleWSEvent(event);
+    }
+    notifyBackgroundImage({ ...e }: Omit<wsEventNotifyBackgroundImage, 'event'>) {
+        let event: wsEventNotifyBackgroundImage = { ...e, event: 'notifyBackgroundImage' }
+        this.ws.send(JSON.stringify(event))
+    }
+    notifyMessage({ ...e }: Omit<wsEventNotifyMessage, 'event'>) {
+        let event: wsEventNotifyMessage = { ...e, event: 'notifyMessage' }
+        this.ws.send(JSON.stringify(event))
     }
     provideStatus(state: playerState) {
         let event: wsEventProvideStatus = { event: 'provideStatus', state }
@@ -448,3 +559,4 @@ export class wsController {
         return this.updateParticipant(participant_id, { damage })
     }
 }
+

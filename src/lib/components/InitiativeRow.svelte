@@ -8,7 +8,9 @@
 	export let participant: Participant;
 	// export let update: (p: Partial<Participant>) => void;
 	// export let callback: (participant_id: number, initiative: number) => {};
-	const dispatch = createEventDispatcher();
+	const dispatch = createEventDispatcher<{
+		initiative_update: { participant_id: number; initiative: number | null | undefined };
+	}>();
 	let dice: number | undefined;
 
 	$: {

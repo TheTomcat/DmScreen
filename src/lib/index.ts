@@ -5,6 +5,26 @@ import type { components } from "./api/v1";
 type Participant = components['schemas']['Participant'];
 type Combat = components['schemas']['Combat'];
 
+export type status = { hp: number, desc: string, style: string }
+
+// export const statuses2: { [hp: number]: string } = {
+//     100: 'Untouched',
+//     75: 'Battered',
+//     50: 'Bloodied',
+//     25: 'Critically injured',
+//     5: 'Death\'s door'
+// }
+
+//https://rpg.stackexchange.com/questions/94726/how-to-improve-my-descriptions-of-the-health-status-of-monsters
+export const statuses: status[] = [
+    { hp: 100, desc: 'Untouched', style: 'blue' },
+    { hp: 75, desc: 'Barely a scratch', style: 'green' },
+    { hp: 50, desc: 'Battered', style: 'yellow' },
+    { hp: 25, desc: 'Bloodied', style: 'yellow' },
+    { hp: 10, desc: 'Badly injured', style: 'orange' },
+    { hp: 0, desc: 'Death\'s door', style: 'red' },
+].toSorted((a, b) => b.hp - a.hp);
+
 export const roll = (dice: string | undefined, mode: RollMode = 'default'): number => {
     if (!dice) return 0;
     const re = /(\d+)\s*d\s*(\d+)(?:\s*\+\s*(\d+))*/;
@@ -112,17 +132,11 @@ export const remainingHp = (participant: Participant): number => {
     return participant.max_hp - participant.damage;
 };
 
-export const describeHealth = (participant: Participant): string => {
+export const describeHealth = (participant: Participant): status => {
     let health = remainingHpPercent(participant);
-    const statuses: { [hp: number]: string } = {
-        100: 'Untouched',
-        75: 'Battered',
-        50: 'Bloodied',
-        25: 'Critically injured',
-        5: 'Death\'s door'
-    }
-    let result = Object.entries(statuses).find(([hp, desc]) => (parseInt(hp) <= health))
-    return result ? result[1] : statuses[100];
+    let result = statuses.find(e => e.hp <= health);
+    //let result = Object.entries(statuses).find(([hp, desc]) => (parseInt(hp) <= health))
+    return result || statuses[0]
 }
 
 export const smartName = (current_participant_id: number, participants: Participant[]): string => {

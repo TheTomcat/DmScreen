@@ -7,6 +7,7 @@
 	import { createEventDispatcher } from 'svelte';
 	import Dialog from './../Dialog.svelte';
 	import { fly } from 'svelte/transition';
+	import HitPointRow from './HitPointRow.svelte';
 
 	const dispatch = createEventDispatcher();
 
@@ -108,14 +109,14 @@
 				<div class="PCs">
 					{#each participants as participant (participant.participant_id)}
 						{#if participant.is_PC}
-							<InitiativeRow bind:participant on:initiative_update={onUpdateInitiative} />
+							<HitPointRow bind:participant on:hitpoint_update={() => {}} />
 						{/if}
 					{/each}
 				</div>
 				<div class="NPCs">
 					{#each participants as participant (participant.participant_id)}
 						{#if !participant.is_PC}
-							<InitiativeRow bind:participant on:initiative_update={onUpdateInitiative} />
+							<HitPointRow bind:participant on:hitpoint_update={() => {}} />
 						{/if}
 					{/each}
 				</div>

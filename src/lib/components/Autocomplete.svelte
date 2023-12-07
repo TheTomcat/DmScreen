@@ -29,13 +29,7 @@
 	export let extractId: (item: T) => string | number;
 	export let debounceTime: number = 400;
 	export let useCache: boolean = false;
-	/**
-	 * Callback function that will execute after the autocomplete field "submits" a value.
-	 * onSubmitCallback = (item: T | string) => {}
-	 * Note that if allowCreation is false, this will always be an item. If
-	 * allowCreation is true, then it may be a string, in which case it is a newly created element.
-	 */
-	//export let onSubmitCallback: Function;
+
 	/**
 	 * Confine the autocomplete field to only display pre-set values, or allow the creation of new ones.
 	 */

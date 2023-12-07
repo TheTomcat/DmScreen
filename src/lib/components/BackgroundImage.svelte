@@ -6,7 +6,7 @@
 	import { browser } from '$app/environment';
 
 	const dispatch = createEventDispatcher<{
-		changing: { image_id: number };
+		changing: { prev_image_id: number | undefined; next_image_id: number };
 		changed: { image_id: number };
 	}>();
 
@@ -66,8 +66,11 @@
 			);
 			if (response.data) {
 				imageData = response.data;
+				dispatch('changing', {
+					prev_image_id: previous_image_id,
+					next_image_id: response.data.image_id
+				});
 				previous_image_id = image_id;
-				dispatch('changing', { image_id: response.data.image_id });
 				preloadImage(imageData.url, (e: Event) => {
 					is_transitioning = true;
 					setTimeout(() => {

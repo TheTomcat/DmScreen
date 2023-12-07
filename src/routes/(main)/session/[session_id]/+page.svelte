@@ -10,19 +10,23 @@
 		ChevronRightSquare,
 		DicesIcon,
 		Droplets,
+		Image,
 		Megaphone,
+		MegaphoneOff,
 		PauseOctagon,
 		PlusSquare,
+		RefreshCw,
 		UploadCloud,
 		X
 	} from 'lucide-svelte';
 	import {
-		wsController,
+		wsClient,
 		initialise,
 		type wsPlayerMode,
 		type playerState,
 		playerStateStore,
-		combat
+		combat,
+		wsController
 	} from '$lib/ws';
 	import client from '$lib/api/index';
 	import type { Combat } from '../../../../app';
@@ -30,6 +34,7 @@
 	import Dialog from '$lib/components/Dialog.svelte';
 	import InitiativeRoller from '$lib/components/InitiativeRoller.svelte';
 	import CombatInitiativeOrder from '$lib/components/CombatInitiativeOrder.svelte';
+	import CombatSetup from '$lib/components/new/CombatSetup.svelte';
 
 	let ws: wsController;
 	let debugmode: boolean = true;
@@ -55,33 +60,40 @@
 		});
 	};
 
-	const makeChangeMode = (mode: wsPlayerMode) => {
-		let changeMode = (e: MouseEvent) => {
-			let ct = e.currentTarget as HTMLDivElement;
-			// console.log(ct);
-			Array.from(ct.parentElement?.children || []).forEach((e) => e.classList.remove('active'));
-			if ($playerStateStore.mode !== 'idle' && mode == $playerStateStore.mode) {
-				ws.changeMode({ mode: 'idle' });
-				ct.classList.remove('active');
-				return;
-			}
-			ct.classList.add('active');
-			ws.changeMode({ mode });
-		};
-		return changeMode;
-	};
+	// const makeChangeMode = (mode: wsPlayerMode) => {
+	// 	let changeMode = (e: MouseEvent) => {
+	// 		let ct = e.currentTarget as HTMLDivElement;
+	// 		// console.log(ct);
+	// 		Array.from(ct.parentElement?.children || []).forEach((e) => e.classList.remove('active'));
+	// 		if ($playerStateStore.mode !== 'idle' && mode == $playerStateStore.mode) {
+	// 			ws.changeMode({ mode: 'idle' });
+	// 			ct.classList.remove('active');
+	// 			return;
+	// 		}
+	// 		ct.classList.add('active');
+	// 		ws.changeMode({ mode });
+	// 	};
+	// 	return changeMode;
+	// };
 
-	const setMode = (mode: wsPlayerMode) => {
-		ws.changeMode({ mode });
-		console.log('mode changed to', mode);
-	};
+	// const setMode = (mode: wsPlayerMode) => {
+	// 	ws.changeMode({ mode });
+	// 	console.log('mode changed to', mode);
+	// };
 
 	let announce = () => {
-		ws.announce({ message: announcement, timeout: 10000 });
+		if (autoClearAnnoucement) {
+			ws.announce({ message: announcement, timeout: 10000, display: true });
+		} else {
+			ws.announce({ message: announcement, timeout: -1, display: true });
+		}
+	};
+	let clearAnnouncement = () => {
+		ws.clearAnnouncement();
 	};
 
 	let announcement: string;
-	let manuallyDismiss: boolean = false;
+	let autoClearAnnoucement: boolean = false;
 </script>
 
 {#if $playerStateStore}
@@ -91,23 +103,49 @@
 			<div><span>{ws && ws.ws.readyState}</span>Connection</div>
 		</div>
 		<div class="main">
-			<div style="display: flex; justify-content: space-between;">
+			<!-- <div style="display: flex; justify-content: space-between;">
 				<h3>Session Controls</h3>
+			</div> -->
+			<div style="display: grid; grid-template-columns: auto 1fr;">
+				<div>Announce:</div>
 				<div>
-					<input type="checkbox" bind:value={manuallyDismiss} />
-					<input bind:value={announcement} />
+					<input bind:value={announcement} placeholder="Announce Message" />
 					<button on:click={announce}>Announce<Megaphone /></button>
-					Cycle Background?
-					<input
+					<label for="autoclearannounce">Automatically Clear</label><input
+						id="autoclearannounce"
 						type="checkbox"
-						bind:checked={$playerStateStore.background_image_cycle}
-						on:change={(e) => {
-							ws.setBackgroundImageCycle({ cycle: $playerStateStore.background_image_cycle });
-						}}
+						bind:checked={autoClearAnnoucement}
 					/>
+					<button on:click={clearAnnouncement} disabled={autoClearAnnoucement}
+						>Clear Announcement<MegaphoneOff /></button
+					>
 				</div>
+				<div>Backdrop</div>
+				<div>
+					<button class:active={$playerStateStore.background_image_display}
+						>Show Background <Image /></button
+					>
+					<button
+						class:active={$playerStateStore.background_image_cycle}
+						on:click={(e) => {
+							ws.setBackgroundImage({
+								cycle: !$playerStateStore.background_image_cycle,
+								display: $playerStateStore.background_image_display,
+								timeout: $playerStateStore.background_image_timeout,
+								image_id: $playerStateStore.background_image_id
+							});
+						}}
+					>
+						Cycle Background <RefreshCw />
+					</button>
+					<input placeholder="Timeout" bind:value={$playerStateStore.background_image_timeout} />
+				</div>
+				<div>Message</div>
+				<div>Details</div>
+				<div>Combat</div>
+				<div>Details</div>
 			</div>
-			<div class="controls">
+			<!-- <div class="controls">
 				<div role="button" tabindex="0" class="screen active" on:click={makeChangeMode('backdrop')}>
 					Backdrop
 				</div>
@@ -128,7 +166,7 @@
 				</div>
 				<div role="button" tabindex="0" class="screen">Handout</div>
 				<div role="button" tabindex="0" class="screen">Map</div>
-			</div>
+			</div> -->
 		</div>
 		{#if $playerStateStore && !$playerStateStore.combat}
 			<div class="main">
@@ -138,7 +176,7 @@
 						Loading combats...
 					{:then combats}
 						{#each combats as combat}
-							<li on:click={() => ws.beginCombat({ combat })}>
+							<li on:click={() => ws.updateCombat({ combat })}>
 								{combat.combat_id} - {combat.title}: {combat.participants.length}
 							</li>
 						{:else}
@@ -211,7 +249,7 @@
 	</div>
 </Dialog>
 {#if $combat && $combat.participants}
-	<InitiativeRoller participants={$combat.participants} bind:dialog={initDialog} />
+	<CombatSetup participants={$combat.participants} bind:dialog={initDialog} />
 {/if}
 
 <style>

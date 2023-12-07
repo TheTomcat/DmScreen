@@ -11,7 +11,8 @@
 
 	export let message_id: number | undefined;
 	export let cycleMessageTimeout: number;
-	// export let cycleMessage: boolean = false;
+	export let cycleMessage: boolean = false;
+
 	let message: Message;
 	$: {
 		if (browser) {
@@ -20,6 +21,7 @@
 	}
 
 	const schedulePageUpdate = (timer = cycleMessageTimeout) => {
+		if (!cycleMessage) return;
 		setTimeout(() => {
 			fetchMessage();
 			schedulePageUpdate(timer);
