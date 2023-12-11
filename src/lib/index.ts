@@ -5,7 +5,7 @@ import type { components } from "./api/v1";
 type Participant = components['schemas']['Participant'];
 type Combat = components['schemas']['Combat'];
 
-export type status = { hp: number, desc: string, style: string }
+export type status = { hp_max: number, hp_min: number, desc: string, style: string }
 
 // export const statuses2: { [hp: number]: string } = {
 //     100: 'Untouched',
@@ -17,13 +17,14 @@ export type status = { hp: number, desc: string, style: string }
 
 //https://rpg.stackexchange.com/questions/94726/how-to-improve-my-descriptions-of-the-health-status-of-monsters
 export const statuses: status[] = [
-    { hp: 100, desc: 'Untouched', style: 'blue' },
-    { hp: 75, desc: 'Barely a scratch', style: 'green' },
-    { hp: 50, desc: 'Battered', style: 'yellow' },
-    { hp: 25, desc: 'Bloodied', style: 'yellow' },
-    { hp: 10, desc: 'Badly injured', style: 'orange' },
-    { hp: 0, desc: 'Death\'s door', style: 'red' },
-].toSorted((a, b) => b.hp - a.hp);
+    { hp_max: 100, hp_min: 100, desc: 'Untouched', style: 'color: green' },
+    { hp_max: 100, hp_min: 75, desc: 'Barely a scratch', style: 'color: green' },
+    { hp_max: 75, hp_min: 50, desc: 'Battered', style: 'color: yellow' },
+    { hp_max: 50, hp_min: 25, desc: 'Bloodied', style: 'color: yellow' },
+    { hp_max: 25, hp_min: 5, desc: 'Badly injured', style: 'color: orange' },
+    { hp_max: 5, hp_min: 0, desc: 'Death\'s door', style: 'color: red' },
+    { hp_max: 0, hp_min: 0, desc: 'Unconscious', style: 'color: grey; text-decoration-line: line-through' }
+].toSorted((a, b) => b.hp_max - a.hp_max);
 
 export const roll = (dice: string | undefined, mode: RollMode = 'default'): number => {
     if (!dice) return 0;
@@ -134,7 +135,7 @@ export const remainingHp = (participant: Participant): number => {
 
 export const describeHealth = (participant: Participant): status => {
     let health = remainingHpPercent(participant);
-    let result = statuses.find(e => e.hp <= health);
+    let result = statuses.find(e => e.hp_max >= health && e.hp_min < health);
     //let result = Object.entries(statuses).find(([hp, desc]) => (parseInt(hp) <= health))
     return result || statuses[0]
 }

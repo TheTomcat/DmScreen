@@ -20,11 +20,11 @@
 	import { capitalise, get_next_PC, is_dead } from '$lib';
 	import { browser } from '$app/environment';
 	import client from '$lib/api/index';
-	import type { Image } from '../../../../app';
+	import type { Image, ImageURL } from '../../../../app';
 	let session_id = 1;
 	let debugmode: boolean = true;
 	let ws: wsReciever;
-	let activeParticipantImage: Image | undefined;
+	let activeParticipantImage: ImageURL | undefined;
 	onMount(() => {
 		ws = new wsReciever(`/live/socket/${session_id}`);
 		initialise();
