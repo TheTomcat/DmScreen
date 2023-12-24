@@ -6,8 +6,7 @@
 	type Participant = components['schemas']['Participant'];
 
 	export let participant: Participant;
-	// export let update: (p: Partial<Participant>) => void;
-	// export let callback: (participant_id: number, initiative: number) => {};
+
 	const dispatch = createEventDispatcher<{
 		initiative_update: { participant_id: number; initiative: number | null | undefined };
 	}>();
@@ -18,27 +17,40 @@
 	}
 
 	const roll = () => {
-		participant.initiative = participant.initiative_modifier + roll_dice(20);
+		participant.initiative = (participant.initiative_modifier || 0) + roll_dice(20);
+		dispatch('initiative_update', {
+			participant_id: participant.participant_id,
+			initiative: participant.initiative
+		});
 	};
 </script>
 
 <!-- <div class="initrow"> -->
-{participant.name}
-<button on:click={roll}><Dices /></button>
-<div class="dicecell">
-	<!-- <input class="initroller" bind:value= type="number" /> -->
-	{dice}{renderModifier(participant.initiative_modifier || 0)}=
-</div>
-<input
-	class="initroller"
-	bind:value={participant.initiative}
-	type="number"
-	on:change={() =>
-		dispatch('initiative_update', {
-			participant_id: participant.participant_id,
-			initiative: participant.initiative
-		})}
-/>
+<td>
+	{participant.name}
+</td>
+<td>
+	<button on:click|preventDefault={roll}><Dices /></button>
+</td>
+<td>
+	<div class="dicecell">
+		<!-- <input class="initroller" bind:value= type="number" /> -->
+		{dice}{renderModifier(participant.initiative_modifier || 0)}=
+
+		<!-- </td>
+<td> -->
+		<input
+			class="initroller"
+			bind:value={participant.initiative}
+			type="number"
+			on:change={() =>
+				dispatch('initiative_update', {
+					participant_id: participant.participant_id,
+					initiative: participant.initiative
+				})}
+		/>
+	</div>
+</td>
 
 <!-- </div> -->
 

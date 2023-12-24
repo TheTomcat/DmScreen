@@ -26,7 +26,7 @@
 	import CombatInitiativeOrder from '$lib/components/CombatInitiativeOrder.svelte';
 	import BackgroundEffect from '$lib/components/BackgroundEffect.svelte';
 	import { combat, loadCombat, set_active_participant } from '$lib/stores/combatStore';
-	import BouncingText from '$lib/components/BouncingText.svelte';
+	import BouncingText from '$lib/components/textEffects/BouncingText.svelte';
 
 	type Image = components['schemas']['ImageURL'];
 	type Participant = components['schemas']['Participant'];

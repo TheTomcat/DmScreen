@@ -4,14 +4,7 @@
 	import BackgroundMessage2 from '$lib/components/BackgroundMessage2.svelte';
 	import CombatManager from '$lib/components/CombatManager.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
-	import {
-		wsClient,
-		playerStateStore,
-		combat,
-		initialise,
-		activeParticipant,
-		wsReciever
-	} from '$lib/ws';
+	import { playerStateStore, combat, initialise, activeParticipant, wsReciever } from '$lib/ws';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { scale } from 'svelte/transition';
@@ -21,8 +14,11 @@
 	import { browser } from '$app/environment';
 	import client from '$lib/api/index';
 	import type { Image, ImageURL } from '../../../../app';
+	import Handout from '$lib/components/new/Handout.svelte';
+	// import BouncingText from '$lib/components/textEffects/BouncingText.svelte';
+	// import GlitchText from '$lib/components/textEffects/GlitchText.svelte';
+	// import SquiggleText from '$lib/components/textEffects/SquiggleText.svelte';
 	let session_id = 1;
-	let debugmode: boolean = true;
 	let ws: wsReciever;
 	let activeParticipantImage: ImageURL | undefined;
 	onMount(() => {
@@ -77,6 +73,7 @@
 		<div class="combatcontainer">
 			<div class="overlay combatants">
 				<h3 class="combatheading">{$combat.title}</h3>
+				Round {$combat.round}
 				<PlayerCombatView />
 			</div>
 			<div class="overlay name">
@@ -112,7 +109,7 @@
 								get_next_PC(
 									$activeParticipant.participant_id,
 									$playerStateStore.combat.participants
-								).next_participant
+								).next_participant_id
 						)?.name}
 					</h2>
 				{/if}
@@ -125,14 +122,22 @@
 		<div class="messagecontainer">
 			<div class="messagebox" transition:scale>
 				<h1>{$playerStateStore.announce_text}</h1>
-				<!-- <BouncingText /> -->
+				<!-- <SquiggleText text={$playerStateStore.announce_text} /> -->
+			</div>
+		</div>
+	{/if}
+	{#if $playerStateStore.handout_display}
+		<div class="handoutcontainer">
+			<div class="messagebox handoutbox" transition:scale>
+				<Handout />
 			</div>
 		</div>
 	{/if}
 {/if}
-<div class="status" class:debug={debugmode}>
+
+<!-- <div class="status" class:debug={debugmode}>
 	{JSON.stringify($playerStateStore)}
-</div>
+</div> -->
 
 <style>
 	.messagecontainer {
@@ -141,13 +146,16 @@
 		width: 100%;
 		height: 100%;
 		transition: opacity 2s;
+		display: flex;
+		justify-content: center;
+		align-items: center;
 	}
 	.messagebox {
 		z-index: 10;
 		position: absolute;
-		top: 50%;
-		left: 50%;
-		transform: translate3d(-50%, -50%, 0);
+		/* top: 50%;
+		left: 50%; */
+		/* transform: translate3d(-50%, -50%, 0); */
 		font-size: xx-large;
 		background: var(--surface-4);
 		width: 80%;
@@ -160,6 +168,21 @@
 		flex-direction: column;
 		justify-content: center;
 		transition: opacity 2s;
+	}
+	.handoutcontainer {
+		backdrop-filter: blur(10px);
+		position: absolute;
+		transition: opacity 2s;
+		width: 100%;
+		height: 100%;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+	}
+	.handoutbox {
+		height: unset;
+		background: unset;
+		width: unset;
 	}
 	.messagebox h1 {
 		max-inline-size: unset;
@@ -190,6 +213,13 @@
 		max-height: 100%;
 
 		/* background-color: red; */
+	}
+	.condition {
+		padding-inline: var(--size-3);
+		padding-block: var(--size-1);
+		margin: var(--size-2);
+		background-color: #333;
+		border-radius: var(--radius-3);
 	}
 	.overlay {
 		background-color: rgba(216, 216, 216, 0.2);

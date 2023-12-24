@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { get } from 'svelte/store';
 	import { debounce } from '$lib';
 
 	type T = $$Generic;
@@ -60,6 +59,10 @@
 		currentIndex = -1;
 	}
 
+	const sortFunction = (a: T, b: T): number => {
+		return extractName(a).length - extractName(b).length; //score(b, query) - score(a, query);
+	};
+
 	const cachedGetData = async (query: string) => {
 		if (!getData) return [];
 		inFlight += 1;
@@ -82,7 +85,7 @@
 			cachedGetData(inputValue).then((response) => {
 				inFlight -= 1;
 				if (mostRecentSearch == inputValue) {
-					filteredItems = response;
+					filteredItems = response.toSorted(sortFunction);
 					currentIndex = 0;
 				}
 			});
@@ -100,6 +103,7 @@
 
 	const clearInput = () => {
 		inputValue = '';
+		currentIndex = -1;
 		searchInput?.focus();
 	};
 
@@ -123,19 +127,24 @@
 		} else if (e.key === 'ArrowUp' && currentIndex >= 0) {
 			currentIndex === 0 ? (currentIndex = filteredItems.length - 1) : (currentIndex -= 1);
 			e.preventDefault();
-		} else if (e.key === 'Enter' && currentIndex >= 0) {
+		} else if (e.key === 'Enter' && currentIndex >= 0 && filteredItems.length > 0) {
+			// console.log(`Enter: Cix ${filteredItems}`);
 			submitExistingData(filteredItems[currentIndex]);
 			e.preventDefault();
 		} else if (e.key === 'Escape') {
 			currentIndex = -1;
 			filteredItems = [];
 		} else if (e.key === 'Enter' && inputValue) {
+			// console.log('Enter');
 			submitUnknownData(inputValue);
 			e.preventDefault();
 		} else if (e.key === 'Enter') {
 			dispatch('emptysubmit');
 			e.preventDefault();
+		} else if (filterItems.length > 0) {
+			currentIndex = 0;
 		} else {
+			currentIndex = -1;
 			return;
 		}
 	};
@@ -231,7 +240,7 @@
 		position: absolute;
 		margin: 0;
 		padding: 0;
-		z-index: 90;
+		z-index: 900;
 		width: 100%;
 		border: 1px solid var(--border);
 		background-color: var(--surface-4);

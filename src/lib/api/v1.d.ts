@@ -213,6 +213,10 @@ export interface paths {
      */
     post: operations["create_tag"];
   };
+  "/tag/orphans": {
+    /** Get Orphan Tags */
+    get: operations["get_orphan_tags"];
+  };
   "/tag/{tag_id}": {
     /**
      * Get Tag
@@ -223,6 +227,10 @@ export interface paths {
     delete: operations["delete_tag"];
     /** Update Tag */
     patch: operations["update_tag"];
+  };
+  "/tag/{tag_id}/merge/{tag2_id}": {
+    /** Merge Tags */
+    put: operations["merge_tags"];
   };
   "/live/": {
     /** Index */
@@ -662,6 +670,8 @@ export interface components {
       damage: number;
       /** Max Hp */
       max_hp?: number | null;
+      /** Hit Dice */
+      hit_dice: string | null;
       /** Ac */
       ac: number;
       /** Initiative */
@@ -703,6 +713,8 @@ export interface components {
       damage?: number;
       /** Max Hp */
       max_hp?: number | null;
+      /** Hit Dice */
+      hit_dice?: string | null;
       /**
        * Ac
        * @default 10
@@ -747,6 +759,8 @@ export interface components {
       damage?: number | null;
       /** Max Hp */
       max_hp?: number | null;
+      /** Hit Dice */
+      hit_dice?: string | null;
       /** Ac */
       ac?: number | null;
       /** Initiative */
@@ -776,6 +790,8 @@ export interface components {
       damage?: number | null;
       /** Max Hp */
       max_hp?: number | null;
+      /** Hit Dice */
+      hit_dice?: string | null;
       /** Ac */
       ac?: number | null;
       /** Initiative */
@@ -1862,6 +1878,7 @@ export interface operations {
     parameters: {
       query?: {
         type?: components["schemas"]["ImageType"] | null;
+        types?: string | null;
         /** @description Page number */
         page?: number;
         /** @description Page size */
@@ -1918,6 +1935,7 @@ export interface operations {
       query: {
         taglist: number[];
         type?: components["schemas"]["ImageType"] | null;
+        types?: string | null;
         /** @description Page number */
         page?: number;
         /** @description Page size */
@@ -2287,6 +2305,17 @@ export interface operations {
       };
     };
   };
+  /** Get Orphan Tags */
+  get_orphan_tags: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Tag"][];
+        };
+      };
+    };
+  };
   /**
    * Get Tag
    * @description Get a single tag by id
@@ -2355,6 +2384,29 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["Tag"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Merge Tags */
+  merge_tags: {
+    parameters: {
+      path: {
+        tag_id: number;
+        tag2_id: number;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": unknown;
         };
       };
       /** @description Validation Error */

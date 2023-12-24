@@ -1,6 +1,7 @@
-import type { Combat, Participant, ParticipantUpdate } from "../app";
+import type { Combat, Entity, Participant, ParticipantUpdate } from "../app";
 import { writable, type Writable, derived } from "svelte/store";
 import client from "$lib/api/index";
+import { roll, rollDice } from "$lib";
 
 let annoucementTimerId: number;
 
@@ -8,6 +9,7 @@ type wsEventHandler = (e: MessageEvent<string>) => void
 
 type wsEventType = "changeMode"
     | "beginCombat"
+    | "showCombat"
     | "updateCombat"
     | "advanceCombat"
     | "suspendCombat"
@@ -20,6 +22,7 @@ type wsEventType = "changeMode"
     | "requestStatus"
     | "notifyBackgroundImage"
     | "notifyMessage"
+    | "setHandout"
 
 export type wsPlayerMode = "loading" | "backdrop" | "combat" | "handout" | "map" | "idle";
 type wsEventChangeMode = {
@@ -30,6 +33,10 @@ type wsEventBeginCombat = {
     event: 'beginCombat'
     combat: Combat
 }
+type wsEventShowCombat = {
+    event: 'showCombat'
+    display: boolean
+}
 type wsEventUpdateCombat = {
     event: 'updateCombat'
     combat: Combat
@@ -37,6 +44,7 @@ type wsEventUpdateCombat = {
 type wsEventAdvanceCombat = {
     event: 'advanceCombat'
     next_participant_id: number
+    have_looped: boolean
 }
 type wsEventSuspendCombat = {
     event: 'suspendCombat'
@@ -67,7 +75,7 @@ type wsEventClearAnnouncement = {
 type wsEventSetHandout = {
     event: 'setHandout'
     display: boolean
-    handout_id: number | undefined
+    handout_id: number | undefined;
 }
 type wsEventShowSpinner = {
     event: 'showSpinner'
@@ -111,10 +119,13 @@ export type playerState = {
     announce_text: string | undefined
     announce_timeout: number
     announce_display: boolean
+    handout_display: boolean
+    handout_image_id: number | undefined;
 }
 
 export type wsEvent = wsEventChangeMode
     | wsEventBeginCombat
+    | wsEventShowCombat
     | wsEventUpdateCombat
     | wsEventAdvanceCombat
     | wsEventSuspendCombat
@@ -127,7 +138,8 @@ export type wsEvent = wsEventChangeMode
     | wsEventProvideStatus
     | wsEventRequestStatus
     | wsEventNotifyBackgroundImage
-    | wsEventNotifyMessage;
+    | wsEventNotifyMessage
+    | wsEventSetHandout;
 
 export const playerStateStore = writable<playerState>();
 export const combat = derived(playerStateStore, ($playerStateStore) => {
@@ -160,6 +172,8 @@ export const initialise = () => {
         announce_text: undefined,
         announce_timeout: 10000,
         announce_display: false,
+        handout_display: false,
+        handout_image_id: undefined
     })
 }
 
@@ -176,6 +190,9 @@ const handleWSEvent = (e: wsEvent) => { //, isClient: boolean = false) => {
     switch (e.event) {
         case 'changeMode':
             playerStateStore.update(makeChangeMode(e))
+            break;
+        case "showCombat":
+            playerStateStore.update(makeShowCombat(e));
             break;
         case "beginCombat":
             playerStateStore.update(makeBeginCombat(e))
@@ -205,6 +222,9 @@ const handleWSEvent = (e: wsEvent) => { //, isClient: boolean = false) => {
             break;
         case "setLoadingMessage":
             playerStateStore.update(makeSetLoadingMessage(e))
+            break;
+        case "setHandout":
+            playerStateStore.update(makeSetHandout(e));
             break;
         case "requestStatus":
             // playerStateStore.update(makeSetLoadingMessage(e))
@@ -254,6 +274,15 @@ const makeSetBackgroundImage = (data: wsEventSetBackgroundImage) => {
     }
     return setBackgroundImage
 }
+const makeShowCombat = (data: wsEventShowCombat) => {
+    let showCombat = (playerState: playerState): playerState => {
+        return {
+            ...playerState,
+            combat_display: data.display
+        }
+    }
+    return showCombat
+}
 const makeNotifyBackgroundImage = (data: wsEventNotifyBackgroundImage) => {
     let notifyBackgroundImage = (playerState: playerState): playerState => {
         return {
@@ -280,6 +309,16 @@ const makeShowSpinner = (data: wsEventShowSpinner) => {
         }
     }
     return showSpinner
+}
+const makeSetHandout = (data: wsEventSetHandout) => {
+    let setHandout = (playerState: playerState): playerState => {
+        return {
+            ...playerState,
+            handout_display: data.display,
+            handout_image_id: data.handout_id
+        }
+    }
+    return setHandout
 }
 // const makeSetBackgroundImageCycle = (data: wsEventSetBackgroundImageCycle) => {
 //     let setBackgroundImageCycle = (playerState: playerState): playerState => {
@@ -313,7 +352,7 @@ export const clearAnnounce = (playerState: playerState): playerState => {
 const makeBeginCombat = (data: wsEventBeginCombat | wsEventUpdateCombat) => {
     let setCombat = (playerState: playerState): playerState => {
         return {
-            ...playerState, combat: data.combat, combat_display: true
+            ...playerState, combat: { ...data.combat, is_active: true, round: 1 }, combat_display: true
         }
     }
     return setCombat
@@ -339,6 +378,7 @@ const makeAdvanceCombat = (data: wsEventAdvanceCombat) => {
             ...playerState, combat: {
                 ...playerState.combat,
                 active_participant_id: data.next_participant_id,
+                round: playerState.combat.round + (data.have_looped ? 1 : 0),
                 participants: [
                     ...playerState.combat.participants.filter(p => p.participant_id != active_participant?.participant_id),
                     active_participant
@@ -355,7 +395,7 @@ const makeAdvanceCombat = (data: wsEventAdvanceCombat) => {
 const makeSuspendCombat = () => {
     let suspendCombat = (playerState: playerState): playerState => {
         delete playerState.combat;
-        return playerState;
+        return { ...playerState, combat_display: false };
     }
     return suspendCombat
 }
@@ -427,6 +467,11 @@ export class wsController {
         handleWSEvent(event)
 
     }
+    showCombat({ ...e }: Omit<wsEventShowCombat, 'event'>) {
+        let event: wsEventShowCombat = { ...e, event: 'showCombat' }
+        this.ws.send(JSON.stringify(event))
+        handleWSEvent(event)
+    }
     showSpinner({ ...e }: Omit<wsEventShowSpinner, 'event'>) {
         let event: wsEventShowSpinner = { ...e, event: 'showSpinner' }
         this.ws.send(JSON.stringify(event))
@@ -446,6 +491,11 @@ export class wsController {
         let event: wsEventAnnounce = { ...e, event: 'announce' }
         this.ws.send(JSON.stringify(event))
         handleWSEvent(event)
+    }
+    setHandout({ ...e }: Omit<wsEventSetHandout, 'event'>) {
+        let event: wsEventSetHandout = { ...e, event: 'setHandout' }
+        this.ws.send(JSON.stringify(event))
+        handleWSEvent(event);
     }
     clearAnnouncement() {
         let event: wsEventClearAnnouncement = { event: 'clearAnnouncement' };
@@ -518,6 +568,129 @@ export class wsController {
         })
     }
 
+    /**
+     * 
+     * @param combat_id 
+     * @param participants list of partial participants, only supports initiative and hp at this point.
+     */
+    async updateParticipants(combat_id: number, participants: { participant_id: number, initiative: number | undefined, initiative_modifier: number | undefined, max_hp: number | undefined, damage: number | undefined }[]) {
+        let response = await client.PATCH('/combat/{combat_id}',
+            {
+                params: {
+                    path: { combat_id },
+                },
+                body: {
+                    participants: participants.map(p => {
+                        return {
+                            participant_id: p.participant_id,
+                            initiative: p.initiative,
+                            initiative_modifier: p.initiative_modifier,
+                            max_hp: p.max_hp,
+                            damage: p.damage
+                        }
+                    })
+                }
+
+            })
+        playerStateStore.update((playerState) => {
+            // let index = newCombat.participants.findIndex(p => p.participant_id == updated_participant.participant_id);
+            if (response.data && response.data.participants && playerState.combat) {
+                let updated_participants = response.data.participants;
+                // console.log({
+                //     ...playerState,
+                //     combat: {
+                //         ...playerState.combat,
+                //         participants: [
+                //             ...(playerState.combat.participants.filter(p => !updated_participants.find(up => p.participant_id == up.participant_id)) || []),
+                //             ...(playerState.combat.participants.filter(p => updated_participants.find(up => p.participant_id == up.participant_id)) || []).map(p => {
+                //                 return {
+                //                     ...p,
+                //                     ...updated_participants.find(up => p.participant_id === up.participant_id)
+                //                 }
+                //             }),
+
+                //         ]
+                //     }
+                // })
+                return {
+                    ...playerState,
+                    combat: {
+                        ...playerState.combat,
+                        participants: [
+                            ...(playerState.combat.participants.filter(p => !updated_participants.find(up => p.participant_id == up.participant_id)) || []),
+                            ...(playerState.combat.participants.filter(p => updated_participants.find(up => p.participant_id == up.participant_id)) || []).map(p => {
+                                return {
+                                    ...p,
+                                    ...updated_participants.find(up => p.participant_id === up.participant_id)
+                                }
+                            }),
+
+                        ]
+                    }
+                }
+            }
+            return playerState
+        })
+    }
+
+    async addParticipantFromEntity(combat_id: number, entity: Entity) {
+        let response = await client.PATCH('/combat/{combat_id}/add', {
+            params: {
+                path: { combat_id },
+            },
+            body:
+                [{
+                    name: entity.name || "New Entity",
+                    entity_id: entity.entity_id,
+                    ac: entity.ac || 10,
+                    hit_dice: entity.hit_dice || '',
+                    max_hp: roll(entity.hit_dice, 'default'),
+                    is_PC: entity.is_PC || false,
+                    damage: 0,
+                    initiative: rollDice(20, entity.initiative_modifier || 0),
+                    has_reaction: true,
+                    is_visible: false,
+                    image_id: entity.image_id
+                }]
+        })
+        if (!response) return;
+        playerStateStore.update(playerState => {
+            if (response.data && response.data.participants && playerState.combat) {
+                return {
+                    ...playerState,
+                    combat: {
+                        ...playerState.combat,
+                        participants: response.data.participants
+                    }
+                }
+            }
+            return playerState
+        })
+    }
+
+    async removeParticipant(participant_id: number) {
+        let response = await client.DELETE('/participant/{participant_id}', {
+            params: {
+                path: { participant_id }
+            }
+        })
+        if (!response) return;
+        playerStateStore.update(playerState => {
+            if (response.data && playerState.combat) {
+                return {
+                    ...playerState,
+                    combat: {
+                        ...playerState.combat,
+                        participants: [
+                            ...playerState.combat?.participants.filter(p => p.participant_id !== participant_id) || []
+                        ]
+                    }
+                }
+            }
+            return playerState
+        })
+    }
+
     setName(participant_id: number, name: string) {
         return this.updateParticipant(participant_id, { name })
     }
@@ -535,7 +708,7 @@ export class wsController {
     }
 
     setConditions(participant_id: number, conditions: string[]) {
-        return this.updateParticipant(participant_id, { conditions: conditions.map(String.prototype.toLowerCase).join(',') })
+        return this.updateParticipant(participant_id, { conditions: conditions.map(s => s.toLowerCase()).join(',') })
     }
 
     setAC(participant_id: number, ac: number) {
@@ -554,8 +727,7 @@ export class wsController {
         return this.updateParticipant(participant_id, { max_hp })
     }
 
-    setDamage(participant_id: number | undefined, damage: number) {
-        if (!participant_id) return;
+    setDamage(participant_id: number, damage: number) {
         return this.updateParticipant(participant_id, { damage })
     }
 }

@@ -35,14 +35,15 @@
 		// console.log($combat);
 	});
 
-	$: filteredEntities = $allEntities.filter((entity) =>
-		entity.name.toLowerCase().includes(entityFilter.toLowerCase())
-	);
+	$: filteredEntities = $allEntities.filter((entity: Entity) => {
+		if (!entity.name) return;
+		entity.name.toLowerCase().includes(entityFilter.toLowerCase());
+	});
 
 	const createParticipantFromEntity = (entity: Entity, mode: RollMode = 'default') => {
 		let participant: Partial<Participant> = {
 			combat_id: combat_id,
-			name: next_name(entity.name, $combat.participants),
+			name: entity.name ? next_name(entity.name, $combat.participants) : '',
 			entity_id: entity.entity_id,
 			max_hp: roll(entity.hit_dice, mode),
 			ac: entity.ac,

@@ -5,6 +5,7 @@
 	import { X } from 'lucide-svelte';
 
 	export let mode = 'mega';
+	export let showMenu: boolean = false;
 
 	const dispatch = createEventDispatcher<{
 		closing: { returnValue: string };
@@ -21,7 +22,7 @@
 
 	let clientHeight: number, clientWidth: number, innerWidth: number;
 
-	function close() {
+	export function close() {
 		dialog.close('close');
 	}
 
@@ -50,7 +51,7 @@
 		}
 		dialog.showModal();
 		isOpen = true;
-		tick().then(() => cancelButton.focus());
+		if (showMenu) tick().then(() => cancelButton.focus());
 	}
 
 	$: offsetModal = topOffset >= 0 && leftOffset >= 0;
@@ -77,10 +78,7 @@
 				<slot name="header" />
 				<button on:click={close} type="button" title="Close dialog">
 					<title>Close dialog icon</title>
-					<!-- <svg width="24" height="24" viewBox="0 0 24 24">
-						<line x1="18" y1="6" x2="6" y2="18" />
-						<line x1="6" y1="6" x2="18" y2="18" />
-					</svg> -->
+
 					<X />
 				</button>
 			</header>
@@ -90,10 +88,12 @@
 		</article>
 		<footer>
 			<slot name="menu" />
-			<menu>
-				<button bind:this={cancelButton} type="button" on:click={close}>Cancel</button>
-				<button type="submit" value="confirm">Confirm</button>
-			</menu>
+			{#if showMenu}
+				<menu>
+					<button bind:this={cancelButton} type="button" on:click={close}>Cancel</button>
+					<button type="submit" value="confirm">Confirm</button>
+				</menu>
+			{/if}
 		</footer>
 	</form>
 </dialog>

@@ -8,19 +8,26 @@
 		ArrowLeft,
 		ArrowRight,
 		ChevronRightSquare,
+		Cross,
+		Dices,
 		DicesIcon,
 		Droplets,
+		Hourglass,
 		Image,
 		Megaphone,
 		MegaphoneOff,
 		PauseOctagon,
+		Play,
 		PlusSquare,
 		RefreshCw,
+		Scroll,
+		ScrollText,
+		SwissFranc,
+		Swords,
 		UploadCloud,
 		X
 	} from 'lucide-svelte';
 	import {
-		wsClient,
 		initialise,
 		type wsPlayerMode,
 		type playerState,
@@ -29,20 +36,35 @@
 		wsController
 	} from '$lib/ws';
 	import client from '$lib/api/index';
-	import type { Combat } from '../../../../app';
-	import { sort_participants_naive } from '$lib';
-	import Dialog from '$lib/components/Dialog.svelte';
+	import type { Combat, Participant } from '../../../../app';
+	import {
+		get_next_alive_participant_id,
+		get_next_participant_id,
+		get_top_initiative_id,
+		sort_participants_by_id,
+		sort_participants_naive
+	} from '$lib';
+	import type Dialog from '$lib/components/Dialog.svelte';
 	import InitiativeRoller from '$lib/components/InitiativeRoller.svelte';
 	import CombatInitiativeOrder from '$lib/components/CombatInitiativeOrder.svelte';
 	import CombatSetup from '$lib/components/new/CombatSetup.svelte';
+	import HitPointRow from '$lib/components/new/HitPointRow.svelte';
+	import HitPointTable from '$lib/components/new/HitPointTable.svelte';
+
+	import Pagination from '$lib/components/Pagination.svelte';
+	import PaginationStub from '$lib/components/PaginationStub.svelte';
 
 	let ws: wsController;
 	let debugmode: boolean = true;
-	let manualMode: boolean = true;
-	let initDialog: Dialog;
-	let resetDialog: Dialog;
+	let manualMode: boolean = false;
+	let initDialog: CombatSetup;
+	let step: 'initiative' | 'hp' = 'hp';
+	let fresh: boolean = true;
 
 	let session_id: number = parseInt($page.params.session_id);
+
+	let currentPage: number = 1;
+	let numPages: number = 1;
 
 	onMount(() => {
 		ws = new wsController(`/live/socket/${session_id}`);
@@ -53,33 +75,14 @@
 		if (ws) ws.close();
 	});
 
-	const getCombats = async () => {
-		return client.GET('/combat/').then((response) => {
+	const getCombats = async (page: number = 1) => {
+		return client.GET('/combat/', { params: { query: { page, size: 10 } } }).then((response) => {
 			if (!response.data) return [];
+			currentPage = response.data.page || 1;
+			numPages = response.data.pages || 1;
 			return response.data.items;
 		});
 	};
-
-	// const makeChangeMode = (mode: wsPlayerMode) => {
-	// 	let changeMode = (e: MouseEvent) => {
-	// 		let ct = e.currentTarget as HTMLDivElement;
-	// 		// console.log(ct);
-	// 		Array.from(ct.parentElement?.children || []).forEach((e) => e.classList.remove('active'));
-	// 		if ($playerStateStore.mode !== 'idle' && mode == $playerStateStore.mode) {
-	// 			ws.changeMode({ mode: 'idle' });
-	// 			ct.classList.remove('active');
-	// 			return;
-	// 		}
-	// 		ct.classList.add('active');
-	// 		ws.changeMode({ mode });
-	// 	};
-	// 	return changeMode;
-	// };
-
-	// const setMode = (mode: wsPlayerMode) => {
-	// 	ws.changeMode({ mode });
-	// 	console.log('mode changed to', mode);
-	// };
 
 	let announce = () => {
 		if (autoClearAnnoucement) {
@@ -94,6 +97,70 @@
 
 	let announcement: string;
 	let autoClearAnnoucement: boolean = false;
+
+	// const setHitPoints = (e: CustomEvent) => {
+	// 	// if (!$combat) return;
+	// 	// ws.updateParticipants($combat.combat_id, e.detail.hitpoints);
+	// 	// console.log(e.detail.hitpoints);
+	// };
+	// const setInitiatives = (e: CustomEvent) => {
+	// 	// if (!$combat) return;
+	// 	// ws.updateParticipants($combat.combat_id, e.detail.initiatives);
+	// 	// console.log(e.detail.initiatives);
+	// };
+	const onChangeParticipants = (e: CustomEvent) => {
+		if (!$combat) return;
+		console.log(e.detail.participants);
+		ws.updateParticipants($combat.combat_id, e.detail.participants);
+	};
+
+	const onSubmitForm = () => {
+		if (!$combat) return;
+		ws.clearAnnouncement();
+		ws.advanceCombat({
+			next_participant_id: get_top_initiative_id($combat.participants),
+			have_looped: false
+		});
+		ws.beginCombat({ combat: $combat });
+	};
+
+	const handleCombatUpdate = (e: CustomEvent<{ combat: Combat }>) => {
+		if (manualMode) {
+			fresh = false;
+		} else {
+			if (!$combat) {
+				console.log('Oh no');
+				return;
+			}
+			ws.updateCombat({ combat: e.detail.combat });
+		}
+	};
+	const rollHP = () => {
+		step = 'hp';
+		if (!$combat) return;
+		// ws.announce({ message: 'Roll for Initiative', timeout: -1, display: true });
+		initDialog.open($combat.participants);
+	};
+	const commenceCombat = () => {
+		step = 'initiative';
+		if (!$combat) return;
+		ws.announce({ message: 'Roll for Initiative', timeout: -1, display: true });
+		initDialog.open($combat.participants);
+	};
+	const onUpdateHitpoints = (
+		e: CustomEvent<{ participant_id: number; max_hp: number; damage: number }>
+	) => {
+		ws.updateParticipant(e.detail.participant_id, {
+			max_hp: e.detail.max_hp,
+			damage: e.detail.damage
+		});
+	};
+
+	const healAll = () => {
+		if (!$combat) return;
+		$combat.participants.forEach((p) => ws.setDamage(p.participant_id, 0));
+		// ws.updateCombat({ combat: $combat });
+	};
 </script>
 
 {#if $playerStateStore}
@@ -122,11 +189,19 @@
 				</div>
 				<div>Backdrop</div>
 				<div>
-					<button class:active={$playerStateStore.background_image_display}
-						>Show Background <Image /></button
+					<button
+						class:checked={$playerStateStore.background_image_display}
+						on:click={(e) => {
+							ws.setBackgroundImage({
+								cycle: $playerStateStore.background_image_cycle,
+								display: !$playerStateStore.background_image_display,
+								timeout: $playerStateStore.background_image_timeout,
+								image_id: $playerStateStore.background_image_id
+							});
+						}}>Show Background <Image /></button
 					>
 					<button
-						class:active={$playerStateStore.background_image_cycle}
+						class:checked={$playerStateStore.background_image_cycle}
 						on:click={(e) => {
 							ws.setBackgroundImage({
 								cycle: !$playerStateStore.background_image_cycle,
@@ -141,49 +216,94 @@
 					<input placeholder="Timeout" bind:value={$playerStateStore.background_image_timeout} />
 				</div>
 				<div>Message</div>
-				<div>Details</div>
+				<div>
+					<button
+						class:checked={$playerStateStore.message_display}
+						on:click={(e) => {
+							ws.setLoadingMessage({
+								cycle: $playerStateStore.message_cycle,
+								display: !$playerStateStore.message_display,
+								timeout: $playerStateStore.message_timeout,
+								message_id: $playerStateStore.message_id
+							});
+						}}>Show Message <ScrollText /></button
+					>
+					<button
+						class:checked={$playerStateStore.message_cycle}
+						on:click={(e) => {
+							ws.setLoadingMessage({
+								cycle: !$playerStateStore.message_cycle,
+								display: $playerStateStore.message_display,
+								timeout: $playerStateStore.message_timeout,
+								message_id: $playerStateStore.message_id
+							});
+						}}
+					>
+						Cycle Message <RefreshCw />
+					</button>
+					<button
+						class:checked={$playerStateStore.spinner_display}
+						on:click={(e) => {
+							ws.showSpinner({
+								display: !$playerStateStore.spinner_display
+							});
+						}}
+					>
+						Show Loading Spinner <Hourglass />
+					</button>
+					<input placeholder="Timeout" bind:value={$playerStateStore.message_timeout} />
+				</div>
 				<div>Combat</div>
-				<div>Details</div>
+				<div>
+					<button
+						class:checked={$playerStateStore.combat_display}
+						on:click={(e) => {
+							ws.showCombat({
+								display: !$playerStateStore.combat_display
+							});
+						}}>Show Combat <Swords /></button
+					>
+				</div>
+				<div>Handout</div>
+				<div>
+					<button
+						class:checked={$playerStateStore.handout_display}
+						on:click={(e) => {
+							ws.setHandout({
+								display: !$playerStateStore.handout_display,
+								handout_id: $playerStateStore.handout_image_id
+							});
+						}}>Show Handout <Scroll /></button
+					>
+					<input placeholder="Handout ID" bind:value={$playerStateStore.handout_image_id} />
+				</div>
 			</div>
-			<!-- <div class="controls">
-				<div role="button" tabindex="0" class="screen active" on:click={makeChangeMode('backdrop')}>
-					Backdrop
-				</div>
-				<div role="button" tabindex="0" class="screen" on:click={makeChangeMode('loading')}>
-					Loading
-					<div class="overlay messagebox" />
-				</div>
-				<div
-					role="button"
-					tabindex="0"
-					class="screen combatcontainer"
-					on:click={makeChangeMode('combat')}
-				>
-					<div class="overlay combatants" />
-					<div class="overlay name" />
-					<div class="portrait" />
-					<div class="overlay upnext" />
-				</div>
-				<div role="button" tabindex="0" class="screen">Handout</div>
-				<div role="button" tabindex="0" class="screen">Map</div>
-			</div> -->
 		</div>
 		{#if $playerStateStore && !$playerStateStore.combat}
 			<div class="main">
 				Combat
-				<ul>
-					{#await getCombats()}
-						Loading combats...
-					{:then combats}
-						{#each combats as combat}
-							<li on:click={() => ws.updateCombat({ combat })}>
-								{combat.combat_id} - {combat.title}: {combat.participants.length}
-							</li>
-						{:else}
-							No combats found
-						{/each}
-					{/await}
-				</ul>
+				{#await getCombats()}
+					Loading combats...
+				{:then combats}
+					<Pagination {currentPage} {numPages} on:change={() => {}} />
+					<table>
+						<thead><th>Id</th><th>Title</th><th>No. participants</th><th>Load</th></thead>
+						<tbody>
+							{#each combats as combat}
+								<tr>
+									<td>{combat.combat_id}</td>
+									<td>{combat.title}</td>
+									<td>{combat.participants.length}</td>
+									<td><button on:click={() => ws.updateCombat({ combat })}><Play /></button></td>
+								</tr>
+							{:else}
+								<tr>
+									<td colspan="4"> No combats found </td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				{/await}
 			</div>
 		{:else if $playerStateStore && $playerStateStore.combat}
 			{#if $combat}
@@ -191,36 +311,69 @@
 					<div style="display: flex; justify-content: space-between;">
 						<h3>Run Combat: {$combat.title}</h3>
 						<div>
-							<button class:checked={manualMode} on:click={() => (manualMode = !manualMode)}
-								>Manual Mode</button
+							<button
+								class:checked={manualMode}
+								on:click={() => {
+									if (!fresh && $combat) ws.updateCombat({ combat: $combat });
+									manualMode = !manualMode;
+								}}>Manual Mode</button
 							>
 							<button
 								disabled={!manualMode}
+								class:checked={!fresh && manualMode}
 								on:click={() => {
-									if ($combat) ws.updateCombat({ combat: $combat });
+									if (!$combat) return;
+									ws.updateCombat({ combat: $combat });
+									fresh = true;
 								}}><UploadCloud /> Push Update</button
 							>
 						</div>
 						<button on:click={() => ws.suspendCombat()}><ArrowLeft />Change Combat</button>
 					</div>
-					{#if $combat && !$combat.is_active}
-						<button on:click={() => initDialog.open()}><DicesIcon /> Roll for Initiative!</button>
-						<button on:click={() => initDialog.open()}><Droplets /> Reset HP!</button>
-						<button on:click={() => initDialog.open()}><PlusSquare /> Add Combatant</button>
+					{#if !$combat.is_active}
+						<!-- <button on:click={rollHP}><Cross /> Roll HP</button> -->
+						<button on:click={commenceCombat}
+							><Swords /> Commence Combat: Roll for Initiative</button
+						>
+						<!-- <button
+							on:click={() => {
+								step = 'hp';
+								if (!$combat) return;
+								initDialog.open($combat.participants);
+							}}><Droplets /> Reset HP!</button
+						> -->
 					{:else}
-						<button><PauseOctagon /> Suspend Combat</button>
-						<button><ChevronRightSquare /> Advance Combat</button>
+						<!-- <button disabled><PauseOctagon /> Suspend Combat</button> -->
+						<button
+							on:click={() => {
+								if ($combat && $combat.active_participant_id) {
+									let p = get_next_alive_participant_id(
+										$combat?.active_participant_id,
+										$combat?.participants
+									);
+									if (p.have_looped) {
+									}
+									ws.advanceCombat({
+										...p
+									});
+								}
+							}}><ChevronRightSquare /> Advance Combat</button
+						>
+						<div>
+							Round {$combat.round}
+						</div>
+						<div>
+							<button on:click={healAll}><Cross /></button>
+							<button on:click={commenceCombat}><Dices /></button>
+						</div>
 					{/if}
 					<div class="init">
-						<CombatInitiativeOrder playerView={false} controller={ws} manualUpdate={true} />
-						<!-- {#each $playerStateStore.combat.participants.toSorted(sort_participants_naive) as participant}
-							{JSON.stringify(participant)}
-						{/each} -->
+						{#if $combat.is_active}
+							<CombatInitiativeOrder controller={ws} on:combat_updated={handleCombatUpdate} />
+						{:else}
+							<HitPointTable controller={ws} />
+						{/if}
 					</div>
-
-					Change combat button: (set playerStateStore.combat as undefined) Display Combat X Allow
-					any modifications Roll for initiative! begin combat - Advance combat - Deal damage/healing
-					- Apply statuses
 				</div>
 			{/if}
 
@@ -233,23 +386,14 @@
 <!-- <div class="status" class:debug={debugmode}>
 	{JSON.stringify($playerStateStore)}
 </div> -->
-<Dialog mode="mega" bind:this={resetDialog}>
-	<section class="icon-header" slot="header">
-		<Droplets />
-		<h3>Roll HP</h3>
-	</section>
-	<div class="content" slot="content">
-		{#if $combat && $combat.participants}
-			{#each $combat.participants as participant}
-				{participant.name}
-			{:else}
-				No participants found
-			{/each}
-		{/if}
-	</div>
-</Dialog>
+
 {#if $combat && $combat.participants}
-	<CombatSetup participants={$combat.participants} bind:dialog={initDialog} />
+	<CombatSetup
+		bind:step
+		bind:this={initDialog}
+		on:changeParticipant={onChangeParticipants}
+		on:submitForm={onSubmitForm}
+	/>
 {/if}
 
 <style>
@@ -378,5 +522,14 @@
 		display: flex;
 		gap: var(--size-3);
 		align-items: center;
+	}
+	.initiativebox {
+		min-width: 800px;
+		/* max-height: 500px; */
+		display: grid;
+		grid-template-columns: 1fr;
+		justify-content: start;
+		align-items: start;
+		column-gap: var(--size-2);
 	}
 </style>

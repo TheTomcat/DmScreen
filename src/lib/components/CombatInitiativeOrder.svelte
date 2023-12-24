@@ -1,51 +1,81 @@
 <script lang="ts">
 	import {
 		sort_participants_naive,
-		smartName,
 		is_dead,
-		roll,
 		remainingHp,
-		remainingHpPercent
+		remainingHpPercent,
+		roll,
+		rollDice,
+		get_next_alive_participant_id,
+		capitalise,
+		is_active
 	} from '$lib';
 	import { flip } from 'svelte/animate';
 	import {
 		CrossIcon,
-		CrownIcon,
-		Dice1,
 		Dices,
 		Droplets,
 		Eye,
 		EyeOff,
+		Pencil,
 		PlusSquare,
-		Rat,
 		RefreshCw,
 		RefreshCwOff,
+		Shield,
 		Skull,
-		SwordsIcon
+		SwordsIcon,
+		X
 	} from 'lucide-svelte';
 	import type { components } from '$lib/api/v1';
-	import type { Participant, Entity, Combat, RollMode } from '../../app';
+	import type { Participant, Entity, Combat } from '../../app';
 	import client from '$lib/api/index';
-	import { playerStateStore, combat } from '$lib/ws';
+	import { combat } from '$lib/ws';
 
-	import tippy from 'svelte-tippy';
-	import { onMount } from 'svelte';
-	import Modal from './Modal.svelte';
+	import { createEventDispatcher, tick } from 'svelte';
 	import type { wsController } from '$lib/ws';
 	import Autocomplete from './Autocomplete.svelte';
+	import EditableText from './EditableText.svelte';
+	import Dialog from './Dialog.svelte';
 
 	// type Participant = components['schemas']['Participant'];
 	// type Combat = components['schemas']['Combat'];
-	export let playerView: boolean = true;
-	export let controller: wsController;
-	export let manualUpdate: boolean = false;
 
-	let dialog: HTMLDialogElement;
-	let showModal: boolean = false;
+	export let controller: wsController;
+
+	const dispatch = createEventDispatcher<{
+		combat_updated: { combat: Combat };
+	}>();
+
+	let damageDialog: Dialog;
 	let damaging_participant: Participant | undefined;
 	let damaging: boolean = true;
 	let damageAmount: number = 0;
 	let damageInputField: HTMLInputElement;
+
+	let conditionsDialog: Dialog;
+	let conditions_parcipitant: Participant | undefined;
+	let conditionInputField: HTMLInputElement;
+	let conditionsChanged: boolean = false;
+	let conditionToAdd: string = '';
+	let conditions: string[] = [];
+
+	let newCombatantDialog: Dialog;
+
+	const Conditions = [
+		'Blinded',
+		'Charmed',
+		'Deafened',
+		'Frightened',
+		'Incapacitated',
+		'Grappled',
+		'Invisible',
+		'Paralysed',
+		'Poisoned',
+		'Prone',
+		'Restrained',
+		'Stunned',
+		'Exhausted'
+	];
 
 	const getEntities = async (q: string) => {
 		return client.GET('/entity/', { params: { query: { name: q, size: 15 } } }).then((response) => {
@@ -54,23 +84,72 @@
 		});
 	};
 	const extractId = (t: Entity): number => t.entity_id;
-	const extractName = (t: Entity): string => t.name || '';
+	const extractName = (t: Entity): string => (t.image_id !== null ? '+' : '') + t.name || '';
 	const addNewCombatant = (e: CustomEvent<Entity>) => {
+		if (!$combat) return;
+		controller.addParticipantFromEntity($combat.combat_id, e.detail);
 		console.log(e);
 	};
 	const addNewQuickCombatant = (e: CustomEvent<{ value: string }>) => {
 		console.log(e);
 	};
+	const showDamagingDialog = (damagingMode: boolean, participant: Participant) => {
+		damaging = damagingMode;
+		damageAmount = 0;
+		damaging_participant = participant;
+		// showModal = true;
+		damageDialog.open();
+		tick().then(() => damageInputField.focus());
+	};
+	const applyDamage = () => {
+		if (damageAmount != 0) {
+			if (!damaging_participant) return;
+			if (!damaging_participant.max_hp) return;
+			let damage = (damaging ? 1 : -1) * damageAmount + (damaging_participant?.damage || 0);
+			if (damage > damaging_participant?.max_hp || 0) damage = damaging_participant.max_hp;
+			if (damage < 0) damage = 0;
+			//if (!damaging_participant || !damaging_participant.participant_id) return;
+			controller.setDamage(damaging_participant?.participant_id, damage).then(() => {
+				if (!$combat) return;
+				dispatch('combat_updated', { combat: $combat });
+			});
+		}
+		damageDialog.close();
+	};
+	const showConditionsDialog = (participant: Participant) => {
+		conditions_parcipitant = participant;
+		conditions = conditions_parcipitant.conditions.split(',').filter((s) => s);
+		conditionToAdd = '';
+		conditionsChanged = false;
+		conditionsDialog.open();
+		tick().then(() => conditionInputField.focus());
+	};
+	const setConditions = () => {
+		console.log(conditions);
+		if (conditionsChanged) {
+			if (!conditions_parcipitant) return;
+			controller.setConditions(conditions_parcipitant.participant_id, conditions).then(() => {
+				if (!$combat) return;
+				dispatch('combat_updated', { combat: $combat });
+			});
+		}
+		conditionsDialog.close();
+	};
+	const onDamageKeyDown = (e: KeyboardEvent) => {
+		if (e.key === 'Enter') applyDamage();
+	};
 </script>
 
-<table style="width: 100%; border-spacing: 0;">
+<table style="width: 100%; border-spacing: 0;" class:inactive={!$combat?.is_active}>
 	<thead>
 		<th><div class="icon"><Dices /></div></th>
+		<th><div class="icon"><Shield /></div></th>
 		<th />
 		<th />
 		<th>Name</th>
-		<th />
+		<th>Conditions</th>
 		<th><div class="icon"><Droplets color="red" /></div></th>
+		<th />
 	</thead>
 	<tbody>
 		{#if $combat && $combat.participants}
@@ -80,11 +159,38 @@
 				<tr
 					animate:flip
 					class:activeparticipant={participant.participant_id == $combat.active_participant_id}
+					class:PC={participant.is_PC}
 				>
-					<td>{!$combat.is_active ? '-' : participant.initiative}</td>
-
-					<td
-						><div style="display: flex; flex-direction: row; justify-content: center;">
+					<td>
+						{#if $combat.is_active}
+							<EditableText
+								value={`${participant.initiative}`}
+								callback={(v) => {
+									return controller
+										.setInitiative(participant.participant_id, parseInt(v))
+										.then(() => {
+											if (!$combat) return;
+											dispatch('combat_updated', { combat: $combat });
+										});
+								}}
+							/>
+						{:else}
+							-
+						{/if}
+					</td>
+					<td>
+						<EditableText
+							value={`${participant.ac}`}
+							callback={(v) => {
+								return controller.setAC(participant.participant_id, parseInt(v)).then(() => {
+									if (!$combat) return;
+									dispatch('combat_updated', { combat: $combat });
+								});
+							}}
+						/>
+					</td>
+					<td>
+						<div style="display: flex; flex-direction: row; justify-content: center;">
 							<span
 								class="circle"
 								style={`background: ${participant.colour || 'unset'}; float: left;`}
@@ -92,21 +198,53 @@
 						</div>
 					</td>
 
-					<td
-						><div style="display: flex; flex-direction: row; justify-content: center;">
+					<td>
+						<div style="display: flex; flex-direction: row; justify-content: center;">
 							<span
 								class="icon"
 								style="position: relative; right: 0;"
-								on:click={() =>
-									controller.setIsVisible(participant.participant_id, !participant.is_visible)}
+								role="button"
+								tabindex="0"
+								on:click={() => {
+									controller
+										.setIsVisible(participant.participant_id, !participant.is_visible)
+										.then(() => {
+											if (!$combat) return;
+											dispatch('combat_updated', { combat: $combat });
+										});
+								}}
+								on:keyup={() => {
+									controller
+										.setIsVisible(participant.participant_id, !participant.is_visible)
+										.then(() => {
+											if (!$combat) return;
+											dispatch('combat_updated', { combat: $combat });
+										});
+								}}
 							>
 								{#if participant.is_visible}<Eye />{:else}<EyeOff />{/if}
 							</span>
 							<span
 								class="icon"
+								role="button"
+								tabindex="0"
 								style="position: relative; right: 0;"
-								on:click={() =>
-									controller.setHasReaction(participant.participant_id, !participant.has_reaction)}
+								on:click={() => {
+									controller
+										.setHasReaction(participant.participant_id, !participant.has_reaction)
+										.then(() => {
+											if (!$combat) return;
+											dispatch('combat_updated', { combat: $combat });
+										});
+								}}
+								on:keyup={() => {
+									controller
+										.setHasReaction(participant.participant_id, !participant.has_reaction)
+										.then(() => {
+											if (!$combat) return;
+											dispatch('combat_updated', { combat: $combat });
+										});
+								}}
 							>
 								{#if participant.has_reaction}<RefreshCw />{:else}<RefreshCwOff />{/if}
 							</span>
@@ -114,62 +252,95 @@
 					</td>
 
 					<td>
-						<!-- {#if playerView} -->
 						<span class:dead={is_dead(participant)} class:player={participant.is_PC}>
-							{smartName(participant.participant_id, $combat.participants /*combat.participants*/)}
+							<EditableText
+								value={participant.name}
+								callback={(v) => {
+									return controller.setName(participant.participant_id, v).then(() => {
+										if (!$combat) return;
+										dispatch('combat_updated', { combat: $combat });
+									});
+								}}
+							/>
 						</span>
-						<!-- {:else}
-						<EditableText
-							value={participant.name}
-							callback={(name) => setName(participant.participant_id, name)}
-						/>
-					{/if} -->
 					</td>
 					<td
-						><div style="display:flex; justify-content: end; gap: var(--size-3)">
+						on:click={() => {
+							showConditionsDialog(participant);
+						}}
+					>
+						<div style="display:flex; justify-content: start; gap: var(--size-3)">
+							<button style="padding-block: 0"><Pencil /></button>
 							{#if is_dead(participant)}<div class="icon">
 									<Skull />
 								</div>
 							{/if}
 							{#each participant.conditions.split(',') as condition}{condition}{/each}
-							<!-- {#if playerView}
-								<span class="icon" style="position: relative; right: 0;">
-									{#if participant.has_reaction}<RefreshCw />{:else}<RefreshCwOff />{/if}
-								</span>
-							{/if} -->
 						</div>
 					</td>
 
-					<td
-						><div class="damage">
-							<button
-								on:click={() => {
-									damaging = true;
-									damageAmount = 0;
-									damaging_participant = participant;
-									showModal = true;
-								}}
-							>
+					<td style="display: flex; justify-content: center; max-inline-size: unset;">
+						<div class="damage">
+							<button on:click={() => showDamagingDialog(true, participant)}>
 								<SwordsIcon color={'red'} />
 							</button>
 							<div class="hitpoints">
-								{remainingHp(participant)}/{participant.max_hp}
+								<!-- <EditableText
+									value={`${remainingHp(participant)}`}
+									callback={(v) => {
+										return controller
+											.setDamage(participant.participant_id, participant.max_hp || 1 - parseInt(v))
+											.then(() => {
+												if (!$combat) return;
+												dispatch('combat_updated', { combat: $combat });
+											});
+									}}
+								/> -->
+								{remainingHp(participant)}
+								/
+								<EditableText
+									value={`${participant.max_hp}`}
+									callback={(v) => {
+										return controller.setMaxHP(participant.participant_id, parseInt(v)).then(() => {
+											if (!$combat) return;
+											dispatch('combat_updated', { combat: $combat });
+										});
+									}}
+								/>
 								<span class="fullhp">
 									<span class="remaininghp" style="width: {remainingHpPercent(participant)}%" />
 								</span>
 							</div>
-							<button
-								on:click={() => {
-									damaging = false;
-									damageAmount = 0;
-									damaging_participant = participant;
-									showModal = true;
-								}}
-							>
+							<button on:click={() => showDamagingDialog(false, participant)}>
 								<CrossIcon color={'green'} />
 							</button>
 						</div>
 					</td>
+					<td
+						><div
+							class="icon"
+							role="button"
+							tabindex="0"
+							on:click={() => {
+								if ($combat?.active_participant_id == participant.participant_id) {
+									let p = get_next_alive_participant_id(
+										$combat?.active_participant_id,
+										$combat?.participants
+									);
+									if (p.have_looped) {
+									}
+									controller.advanceCombat({
+										...p
+									});
+									controller.removeParticipant(participant.participant_id);
+								} else {
+									controller.removeParticipant(participant.participant_id);
+								}
+							}}
+						>
+							<X />
+						</div></td
+					>
 				</tr>
 			{/each}
 		{/if}
@@ -177,7 +348,7 @@
 	<tfoot>
 		<tr
 			><td colspan="3">Add Combatant</td>
-			<td colspan="2"
+			<td colspan="3"
 				><Autocomplete
 					getData={getEntities}
 					{extractId}
@@ -188,47 +359,126 @@
 					placeholder={'Search for a Combatant'}
 				/></td
 			>
-			<td><button><PlusSquare />Quick-add combatant</button></td>
+			<td colspan="2"><button><PlusSquare />Quick-add combatant</button></td>
 		</tr>
 	</tfoot>
 </table>
-<!-- <div>
-	{#if !playerView}{/if}
-</div> -->
 
-<Modal bind:dialog bind:showModal params={{ allowCasualDismiss: true, showClose: false }}>
-	{#if damaging_participant && damaging_participant.participant_id}
-		<h5>Apply {`${damaging ? 'damage' : 'healing'}`} to {damaging_participant.name}</h5>
-		<input
-			placeholder={`Apply ${damaging ? 'damage' : 'healing'}`}
-			bind:value={damageAmount}
-			bind:this={damageInputField}
-		/><button
-			on:click={() => {
-				if (damageAmount != 0) {
-					let damage = (damaging ? 1 : -1) * damageAmount + (damaging_participant?.damage || 0);
-					if (damage > damaging_participant.max_hp) damage = damaging_participant.max_hp;
-					if (damage < 0) damage = 0;
-					controller.setDamage(damaging_participant?.participant_id, damage);
-				}
-				dialog.close();
-			}}>{`Apply ${damaging ? 'damage' : 'healing'}`}</button
-		>
-	{/if}
-</Modal>
+<Dialog mode="mega" showMenu={false} bind:this={damageDialog}>
+	<div slot="content">
+		{#if damaging_participant && damaging_participant.participant_id}
+			<h5>Apply {`${damaging ? 'damage' : 'healing'}`} to {damaging_participant.name}</h5>
+			<input
+				placeholder={`Apply ${damaging ? 'damage' : 'healing'}`}
+				bind:value={damageAmount}
+				bind:this={damageInputField}
+				on:keydown={onDamageKeyDown}
+			/>
+			{#if damaging}
+				<button on:click={applyDamage}><SwordsIcon color={'red'} />Apply Damage</button>
+			{:else}
+				<button on:click={applyDamage}><CrossIcon color={'green'} />Apply Healing</button>
+			{/if}
+		{/if}
+	</div>
+</Dialog>
 
-<!-- <Modal bind:damageDialog bind:showDamageModal params={{ allowCasualDismiss: true, showClose: false }} /> -->
+<Dialog mode="mega" showMenu={false} bind:this={conditionsDialog}>
+	<div slot="header">
+		{#if conditions_parcipitant}
+			<h5>Apply condition to {conditions_parcipitant.name}</h5>
+		{/if}
+	</div>
+	<div slot="content">
+		{#if conditions_parcipitant && conditions_parcipitant.participant_id}
+			<div style="height: 300px;">
+				<div>
+					{#each conditions as condition}
+						<div
+							style="display: flex; flex-direction: row; justify-content: start;"
+							on:click={() => {
+								conditions = conditions.filter((c) => c !== condition);
+								conditionsChanged = true;
+							}}
+							on:keyup={() => {
+								conditions = conditions.filter((c) => c !== condition);
+								conditionsChanged = true;
+							}}
+							role="button"
+							tabindex="0"
+						>
+							{capitalise(condition)}<span style="padding-left: var(--size-1);"><X /></span>
+						</div>
+					{/each}
+				</div>
+				<Autocomplete
+					allItems={Conditions}
+					debounceTime={0}
+					placeholder="Apply Condition"
+					extractName={(s) => s}
+					extractId={(s) => s}
+					allowCreation={true}
+					bind:searchInput={conditionInputField}
+					on:submititem={(s) => {
+						console.log(s);
+						if (!conditions_parcipitant) return;
+						if (s.detail === '') return;
+						conditions = [...conditions, s.detail.toLowerCase()];
+						conditionToAdd = '';
+						conditionsChanged = true;
+					}}
+					on:submitnew={(s) => {
+						console.log(s);
+						if (!conditions_parcipitant) return;
+						if (s.detail.value === '') return;
+						conditions = [...conditions, s.detail.value.toLowerCase()];
+						conditionToAdd = '';
+						conditionsChanged = true;
+					}}
+					on:emptysubmit={() => {
+						setConditions();
+						conditionsDialog.close();
+					}}
+				/>
+			</div>
+		{/if}
+	</div>
+	<div slot="menu">
+		<button on:click={setConditions}>Set</button>
+		<button on:click={conditionsDialog.close}>Cancel</button>
+	</div>
+</Dialog>
+<Dialog mode="mega" showMenu={false} bind:this={newCombatantDialog}>
+	<div slot="header">
+		<PlusSquare />
+		<h5>Quick-Add Combatant</h5>
+	</div>
+	<div slot="content" />
+</Dialog>
 
 <style>
-	.activeparticipant {
-		background: linear-gradient(70deg, #334, #777);
-		background-size: 400% 400%;
-		animation: gradient 5s ease infinite;
-		background-color: transparent;
+	/* table.inactive * {
+		pointer-events: none;
+		opacity: 0.7;
+		background-color: #777;
+	} */
+	/* tr.PC {
+		background: linear-gradient(45deg, #353, #797);
+		animation: gra 5s ease infinite;
+		background-size: 200% 200%;
 	}
-	.activeparticipant td {
+	tr.PC > td {
 		background: unset;
-		border: 0;
+	} */
+	tr.activeparticipant {
+		background: linear-gradient(70deg, #334, #777);
+		background-size: 200% 200%;
+		animation: gra 5s ease infinite;
+		background-color: transparent;
+		/* border: 2px solid red; */
+	}
+	tr.activeparticipant > td {
+		background: unset;
 	}
 	tr:last-of-type {
 		border-bottom-left-radius: var(--radius-3);
@@ -240,6 +490,7 @@
 	tr:last-of-type td:last-of-type {
 		border-bottom-right-radius: var(--radius-3);
 	}
+
 	.icon {
 		display: flex;
 		justify-content: center;
@@ -270,7 +521,7 @@
 		column-gap: var(--size-2);
 		/* justify-content: space-between; */
 		align-items: center;
-		width: 100%;
+		/* width: 100%; */
 		white-space: nowrap;
 		margin: auto;
 	}
@@ -296,6 +547,18 @@
 		transition: width 0.5s;
 	}
 	.hitpoints {
+		display: inline;
 		width: var(--size-10);
+	}
+	@keyframes gra {
+		0% {
+			background-position: 0% 45%;
+		}
+		50% {
+			background-position: 100% 56%;
+		}
+		100% {
+			background-position: 0% 45%;
+		}
 	}
 </style>

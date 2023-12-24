@@ -7,26 +7,31 @@ type Combat = components['schemas']['Combat'];
 
 export type status = { hp_max: number, hp_min: number, desc: string, style: string }
 
-// export const statuses2: { [hp: number]: string } = {
-//     100: 'Untouched',
-//     75: 'Battered',
-//     50: 'Bloodied',
-//     25: 'Critically injured',
-//     5: 'Death\'s door'
-// }
-
 //https://rpg.stackexchange.com/questions/94726/how-to-improve-my-descriptions-of-the-health-status-of-monsters
 export const statuses: status[] = [
     { hp_max: 100, hp_min: 100, desc: 'Untouched', style: 'color: green' },
     { hp_max: 100, hp_min: 75, desc: 'Barely a scratch', style: 'color: green' },
     { hp_max: 75, hp_min: 50, desc: 'Battered', style: 'color: yellow' },
-    { hp_max: 50, hp_min: 25, desc: 'Bloodied', style: 'color: yellow' },
-    { hp_max: 25, hp_min: 5, desc: 'Badly injured', style: 'color: orange' },
-    { hp_max: 5, hp_min: 0, desc: 'Death\'s door', style: 'color: red' },
-    { hp_max: 0, hp_min: 0, desc: 'Unconscious', style: 'color: grey; text-decoration-line: line-through' }
+    { hp_max: 50, hp_min: 25, desc: 'Bloodied', style: 'color: orange' },
+    { hp_max: 25, hp_min: 10, desc: 'Badly injured', style: 'color: red' },
+    { hp_max: 10, hp_min: 0.1, desc: 'Death\'s door', style: 'color: #a03' },
+    { hp_max: 0.1, hp_min: 0, desc: 'Unconscious', style: 'color: grey; text-decoration-line: line-through' }
 ].toSorted((a, b) => b.hp_max - a.hp_max);
+const statusDeathsdoor = statuses[5];
+const statusUnconscious = statuses[6];
 
-export const roll = (dice: string | undefined, mode: RollMode = 'default'): number => {
+export const describeHealth = (participant: Participant): status => {
+
+    if (!participant.max_hp) return statuses[0];
+    if (participant.damage >= participant.max_hp) return statusUnconscious;
+    if (participant.max_hp - participant.damage <= 10 && participant.max_hp >= 10) return statusDeathsdoor;
+    let health = remainingHpPercent(participant);
+    let result = statuses.find(e => e.hp_max >= health && e.hp_min <= health);
+    //let result = Object.entries(statuses).find(([hp, desc]) => (parseInt(hp) <= health))
+    return result || statuses[0]
+}
+
+export const roll = (dice: string | undefined | null, mode: RollMode = 'default'): number => {
     if (!dice) return 0;
     const re = /(\d+)\s*d\s*(\d+)(?:\s*\+\s*(\d+))*/;
     const components = dice.match(re);
@@ -86,20 +91,33 @@ export const sort_participants_naive = (a: Participant, b: Participant): number 
     return s1 || s2 || s3;
 };
 
+export const sort_participants_by_id = (a: Participant, b: Participant): number => {
+    return a.participant_id - b.participant_id;
+}
+
 export const make_sort_participants_ordered = (order: number[]) => {
+    console.error("make_sort_participants_ordered is depreciated")
     return (a: Participant, b: Participant) => {
         if (!(order.includes(a.participant_id) || order.includes(b.participant_id))) return 0;
         return order.indexOf(a.participant_id) - order.indexOf(b.participant_id)
     }
 }
 
-export const get_next_participant_id = (current_participant_id: number, participants: Participant[]): { next_participant: number, have_looped: boolean } => {
-    let p = participants.toSorted(sort_participants_naive);
+export const get_next_participant_id = (current_participant_id: number, participants: Participant[]): { next_participant_id: number, have_looped: boolean } => {
+    let p = participants.filter(p => p.is_visible || p.participant_id === current_participant_id).toSorted(sort_participants_naive);
     let i = p.findIndex(p => p.participant_id == current_participant_id);
-    if (i == -1) return { next_participant: current_participant_id, have_looped: false };
+    if (i == -1) {
+        console.log("Invalid next participant?")
+        return { next_participant_id: current_participant_id, have_looped: false };
+    }
     let next = (i + 1) % p.length
+    //console.log({ next_participant_id: p[next].participant_id, have_looped: next == 0 })
+    return { next_participant_id: p[next].participant_id, have_looped: next == 0 }
+}
 
-    return { next_participant: p[next].participant_id, have_looped: i <= next }
+export const get_top_initiative_id = (participants: Participant[]): number => {
+    let p = participants.filter(p => !is_dead(p) && p.is_visible).toSorted(sort_participants_naive);
+    return p[0].participant_id;
 }
 
 export const is_dead = (p: Participant): boolean => {
@@ -112,12 +130,12 @@ export const is_active = (ps: Participant[]): boolean => {
     return ps.every((p) => p.initiative && p.initiative > 0);
 };
 
-export const get_next_alive_participant_id = (current_participant_id: number, participants: Participant[]): { next_participant: number, have_looped: boolean } => {
+export const get_next_alive_participant_id = (current_participant_id: number, participants: Participant[]): { next_participant_id: number, have_looped: boolean } => {
     let aliveOrPC = participants.filter(p => (!is_dead(p)) || p.is_PC || p.participant_id == current_participant_id)
     return get_next_participant_id(current_participant_id, aliveOrPC);
 }
 
-export const get_next_PC = (current_participant_id: number, participants: Participant[]): { next_participant: number, have_looped: boolean } => {
+export const get_next_PC = (current_participant_id: number, participants: Participant[]): { next_participant_id: number, have_looped: boolean } => {
     let PCs = participants.filter(p => p.is_PC || p.participant_id == current_participant_id)
     return get_next_participant_id(current_participant_id, PCs)
 }
@@ -132,13 +150,6 @@ export const remainingHp = (participant: Participant): number => {
     if (participant.damage == undefined) return 100;
     return participant.max_hp - participant.damage;
 };
-
-export const describeHealth = (participant: Participant): status => {
-    let health = remainingHpPercent(participant);
-    let result = statuses.find(e => e.hp_max >= health && e.hp_min < health);
-    //let result = Object.entries(statuses).find(([hp, desc]) => (parseInt(hp) <= health))
-    return result || statuses[0]
-}
 
 export const smartName = (current_participant_id: number, participants: Participant[]): string => {
     let name = participants.find(p => p.participant_id == current_participant_id)?.name;
@@ -156,7 +167,11 @@ export const smartName = (current_participant_id: number, participants: Particip
     return `${name.substring(1)} ${myPosition + 1}`
 }
 
-
+// export const updateSelected = (originalData: T[], newData: T[], getID: ((p: T)=>number)) => {
+//     return [
+//         ...originalData.filter(p => newData.)
+//     ]
+// }
 
 
 // const testSmartName = () => {

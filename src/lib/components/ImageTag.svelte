@@ -18,16 +18,9 @@
 >
 	{tag.tag}
 	{#if interactive}
-		<span
-			role="button"
-			class="close"
-			class:interactive
-			tabindex="0"
-			on:click={() => dispatch('clickclose')}
-			on:keydown={() => dispatch('clickclose')}
-		>
+		<button class="close" class:interactive tabindex="0" on:click={() => dispatch('clickclose')}>
 			<X />
-		</span>
+		</button>
 	{/if}
 </button>
 
@@ -42,6 +35,10 @@
 		box-shadow: var(--shadow-4);
 		margin-inline: var(--size-1);
 		cursor: default;
+	}
+	button.close {
+		border: unset;
+		padding: unset;
 	}
 	.highlight {
 		background-color: var(--brand-background);

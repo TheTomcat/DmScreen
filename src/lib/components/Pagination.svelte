@@ -6,7 +6,9 @@
 	// export let pageSize: number;
 	export let numPages: number;
 
-	const dispatch = createEventDispatcher();
+	const dispatch = createEventDispatcher<{
+		change: number;
+	}>();
 
 	function range(size: number, startAt: number = 0): number[] {
 		return [...Array(size).keys()].map((i) => i + startAt);

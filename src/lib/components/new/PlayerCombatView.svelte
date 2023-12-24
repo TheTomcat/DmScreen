@@ -1,5 +1,12 @@
 <script lang="ts">
-	import { sort_participants_naive, smartName, is_dead, describeHealth } from '$lib';
+	import {
+		sort_participants_naive,
+		smartName,
+		is_dead,
+		describeHealth,
+		remainingHpPercent,
+		capitalise
+	} from '$lib';
 	import { flip } from 'svelte/animate';
 	import { Dices, Droplets, RefreshCw, RefreshCwOff, Skull } from 'lucide-svelte';
 
@@ -29,13 +36,7 @@
 				>
 					<td>{participant.initiative}</td>
 
-					<td
-						><div style="display: flex; flex-direction: row; justify-content: center;">
-							<span
-								class="circle"
-								style={`background: ${participant.colour || 'unset'}; float: left;`}
-							/>
-						</div>
+					<td>
 						<div style="display: flex; flex-direction: row; justify-content: center;">
 							<span class="icon" style="position: relative; right: 0;">
 								{#if participant.has_reaction}<RefreshCw />{:else}<RefreshCwOff />{/if}
@@ -44,6 +45,12 @@
 					</td>
 
 					<td>
+						<!-- <div style="display: flex; flex-direction: row; justify-content: center;">
+							<span
+								class="circle"
+								style={`background: ${participant.colour || 'unset'}; float: left;`}
+							/>
+						</div> -->
 						<span class:dead={is_dead(participant)} class:player={participant.is_PC}>
 							{smartName(participant.participant_id, $combat.participants /*combat.participants*/)}
 						</span>
@@ -54,13 +61,16 @@
 									<Skull />
 								</div>
 							{/if}
-							{#each participant.conditions.split(',') as condition}{condition}{/each}
+							{participant.conditions.split(',').map(capitalise).join(', ')}
 						</div>
 					</td>
 
 					<td
-						><div class="damage" style={`color:${describeHealth(participant).style}`}>
+						><div class="damage hitpoints" style={`${describeHealth(participant).style}`}>
 							{describeHealth(participant).desc}
+							<span class="fullhp">
+								<span class="remaininghp" style="width: {remainingHpPercent(participant)}%" />
+							</span>
 						</div>
 					</td>
 				</tr>
@@ -114,16 +124,7 @@
 	.player {
 		color: var(--success);
 	}
-	.damage {
-		display: grid;
-		grid-template-columns: var(--size-8) var(--size-10) var(--size-8);
-		column-gap: var(--size-2);
-		/* justify-content: space-between; */
-		align-items: center;
-		width: 100%;
-		white-space: nowrap;
-		margin: auto;
-	}
+
 	.damage button {
 		padding: var(--size-1);
 	}

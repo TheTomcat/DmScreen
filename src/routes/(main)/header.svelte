@@ -12,13 +12,13 @@
 			<a href="/build">Build</a>
 		</li>
 		<li>
-			<a href="/maintain">Manage</a>
+			<a href="/library">Manage</a>
 		</li>
 		<li>
-			<a href="/run">Run</a>
+			<a href="/session">Run</a>
 		</li>
 		<li>
-			<a href="/view">View</a>
+			<a href="/room">View</a>
 		</li>
 	</ul>
 	<button>Button</button>

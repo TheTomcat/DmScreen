@@ -18,8 +18,8 @@
 	const extractId = (t: Tag) => t.tag_id;
 	const extractName = (t: Tag) => t.tag;
 
-	const getData = (q: string, callback: Function) => {
-		client.GET('/tag/', { params: { query: { tag: q } } }).then((res) => {
+	const getData = (q: string) => {
+		return client.GET('/tag/', { params: { query: { tag: q } } }).then((res) => {
 			// console.log(res.data);
 			if (!res.data) {
 				console.error('No Data');
@@ -29,13 +29,15 @@
 				console.error('Bad Error:');
 				return [];
 			}
-			callback(res.data.items);
+			return res.data.items;
+			// callback(res.data.items);
 		});
 	};
 
 	/////////////////////API INTERACTION////////////////////////////////
 	const addTagTag = (tag: Tag) => {
 		if (!image) return;
+		if (image.tags.find((t) => t.tag_id == tag.tag_id)) return;
 		client
 			.PATCH('/image/{image_id}/tag', {
 				params: { query: { tag_id: tag.tag_id }, path: { image_id: image.image_id } }
@@ -47,11 +49,22 @@
 			});
 	};
 	const addNewTag = (tagname: string) => {
-		client.POST('/tag/', { body: { tag: tagname } }).then((tag) => {
-			if (tag.data) {
-				addTagTag(tag.data);
-			}
-		});
+		tagname = tagname.trim();
+		if (!image) return;
+		if (image.tags.find((t) => t.tag.toLowerCase() == tagname.toLowerCase())) return;
+		client
+			.POST('/tag/', { body: { tag: tagname } })
+			.then((tag) => {
+				if (tag.data) {
+					addTagTag(tag.data);
+				}
+				if (tag.error) {
+				}
+			})
+			.catch((e) => {
+				// console.log('An error occurred');
+				// console.error(e);
+			});
 	};
 	const removeTag = (tag: Tag) => {
 		if (!image) return;
@@ -233,6 +246,7 @@
 	}
 	.tags {
 		grid-area: tags;
+		height: var(--size-12);
 	}
 	.nav {
 		grid-area: nav;
