@@ -14,8 +14,8 @@ export const statuses: status[] = [
     { hp_max: 75, hp_min: 50, desc: 'Battered', style: 'color: yellow' },
     { hp_max: 50, hp_min: 25, desc: 'Bloodied', style: 'color: orange' },
     { hp_max: 25, hp_min: 10, desc: 'Badly injured', style: 'color: red' },
-    { hp_max: 10, hp_min: 0.1, desc: 'Death\'s door', style: 'color: #a03' },
-    { hp_max: 0.1, hp_min: 0, desc: 'Unconscious', style: 'color: grey; text-decoration-line: line-through' }
+    { hp_max: 10, hp_min: 0, desc: 'Death\'s door', style: 'color: #a03' },
+    { hp_max: 0, hp_min: 0, desc: 'Unconscious', style: 'color: grey; text-decoration-line: line-through' }
 ].toSorted((a, b) => b.hp_max - a.hp_max);
 const statusDeathsdoor = statuses[5];
 const statusUnconscious = statuses[6];
@@ -24,7 +24,7 @@ export const describeHealth = (participant: Participant): status => {
 
     if (!participant.max_hp) return statuses[0];
     if (participant.damage >= participant.max_hp) return statusUnconscious;
-    if (participant.max_hp - participant.damage <= 10 && participant.max_hp >= 10) return statusDeathsdoor;
+    if (participant.max_hp - participant.damage <= 10 && participant.max_hp >= 20) return statusDeathsdoor;
     let health = remainingHpPercent(participant);
     let result = statuses.find(e => e.hp_max >= health && e.hp_min <= health);
     //let result = Object.entries(statuses).find(([hp, desc]) => (parseInt(hp) <= health))
@@ -56,6 +56,11 @@ export const roll = (dice: string | undefined | null, mode: RollMode = 'default'
     }
 };
 
+export const ordinal = (n: number | string): string => {
+    let lastDigit = `${n}`.at(-1) || 0;
+    return `${n}` + (lastDigit == '1' ? 'st' : lastDigit == '2' ? 'nd' : lastDigit == '3' ? 'rd' : 'th')
+}
+
 export const roll_dice = (d: number): number => {
     return Math.floor(Math.random() * d) + 1;
 };
@@ -64,6 +69,9 @@ export const renderModifier = (modifier: number): string => {
     if (modifier >= 0) return `+${modifier}`;
     return `${modifier}`;
 };
+export const renderModifierFromAbilityScore = (abilityScore: number): string => {
+    return renderModifier(Math.floor((abilityScore - 10) / 2))
+}
 
 export const rollDice = (d: number, modifier: number): number => {
     return Math.floor(Math.random() * d) + 1 + modifier;

@@ -3,14 +3,14 @@
 	import { createEventDispatcher } from 'svelte';
 	import { DicesIcon, Droplets } from 'lucide-svelte';
 	import type { components } from '$lib/api/v1';
-	import { roll_dice } from '$lib';
+	import { roll_dice, sort_participants_naive } from '$lib';
 	import Dialog from './../Dialog.svelte';
 	import InitiativeRow from './../InitiativeRow.svelte';
 	import HitPointRow from './HitPointRow.svelte';
 
 	const dispatch = createEventDispatcher<{
 		changeParticipant: { participants: PartialParticipant[] };
-		// setHitPoints: {};
+		changeParticipantNames: { participants: { participant_id: number; name: string }[] };
 		setInitiatives: {};
 		submitForm: {};
 	}>();
@@ -19,7 +19,7 @@
 
 	let participants: Participant[] = [];
 	let dialog: Dialog;
-	export let step: 'initiative' | 'hp' = 'hp';
+	// export let step: 'initiative' | 'hp' = 'hp';
 
 	type Initiative = {
 		participant_id: number;
@@ -41,6 +41,10 @@
 			let partial_participant = partial_participants.find(
 				(pp) => pp.participant_id === p.participant_id
 			);
+			// @ts-ignore This is because of a hack that I implemented in the backend, where data is sometimes present and sometimes not.
+			// Ideally, when this function is called, participant.data should not be present.
+			// delete updated_participant?.data;
+			delete partial_participant?.data;
 			if (partial_participant) {
 				return { ...p, ...partial_participant };
 			} else {
@@ -118,6 +122,29 @@
 		updateParticipants(updated_participants);
 	};
 
+	const smartName = () => {
+		let i = participants.toSorted(sort_participants_naive).map((participant) => {
+			if (!participant.is_visible) {
+				return { participant_id: participant.participant_id, name: participant.name };
+			}
+			// Get every participant with the same name
+			let sameNames = participants
+				.filter((p) => p.name == participant.name && p.is_visible)
+				.toSorted(sort_participants_naive);
+			if (sameNames.length == 1) {
+				return { participant_id: participant.participant_id, name: participant.name };
+			}
+			let myPosition = sameNames.findIndex((p) => p.participant_id == participant.participant_id);
+			return {
+				participant_id: participant.participant_id,
+				name: `${participant.name} ${myPosition + 1}`
+			};
+			// console.log();
+		});
+		console.log(i);
+		dispatch('changeParticipantNames', { participants: i });
+	};
+
 	// const healAll = () => {
 	// 	participants.forEach((p) => updateHitpoints(p.participant_id, p.max_hp || 1, 0));
 	// 	updateParticipants(updated_participants);
@@ -131,46 +158,46 @@
 
 <Dialog mode="mega" bind:this={dialog}>
 	<section slot="header">
-		{#if step == 'initiative'}
-			<div class="icon-header">
-				<DicesIcon />
-				<h3>Roll Initiative</h3>
-			</div>
-		{:else}
+		<!-- {#if step == 'initiative'} -->
+		<div class="icon-header">
+			<DicesIcon />
+			<h3>Roll Initiative</h3>
+		</div>
+		<!-- {:else}
 			<div class="icon-header">
 				<Droplets />
 				<h3>Set HP</h3>
 			</div>
-		{/if}
+		{/if} -->
 	</section>
 	<div class="content" slot="content">
-		{#if step == 'initiative'}
-			<div class="initiativebox">
-				<!-- <div class="PCs"> -->
-				<table style="width: 100%">
-					<thead><th colspan="3">PCs</th></thead>
-					<thead><th>Name</th><th>Roll</th><th>Initiative</th></thead>
-					{#each participants as participant (participant.participant_id)}
-						{#if participant.is_PC}
-							<tr>
-								<InitiativeRow bind:participant on:initiative_update={onUpdateInitiative} />
-							</tr>
-						{/if}
-					{/each}
+		<!-- {#if step == 'initiative'} -->
+		<div class="initiativebox">
+			<!-- <div class="PCs"> -->
+			<table style="width: 100%">
+				<thead><th colspan="3">PCs</th></thead>
+				<thead><th>Name</th><th>Roll</th><th>Initiative</th></thead>
+				{#each participants as participant (participant.participant_id)}
+					{#if participant.is_PC}
+						<tr>
+							<InitiativeRow bind:participant on:initiative_update={onUpdateInitiative} />
+						</tr>
+					{/if}
+				{/each}
 
-					<thead><th colspan="3">NPCs</th></thead>
-					<thead><th>Name</th><th>Roll</th><th>Initiative</th></thead>
-					{#each participants as participant (participant.participant_id)}
-						{#if !participant.is_PC}
-							<tr>
-								<InitiativeRow bind:participant on:initiative_update={onUpdateInitiative} />
-							</tr>
-						{/if}
-					{/each}
-				</table>
-			</div>
-		{:else}
-			<!-- <div class="initiativebox">
+				<thead><th colspan="3">NPCs</th></thead>
+				<thead><th>Name</th><th>Roll</th><th>Initiative</th></thead>
+				{#each participants as participant (participant.participant_id)}
+					{#if !participant.is_PC}
+						<tr>
+							<InitiativeRow bind:participant on:initiative_update={onUpdateInitiative} />
+						</tr>
+					{/if}
+				{/each}
+			</table>
+		</div>
+		<!-- {:else} -->
+		<!-- <div class="initiativebox">
 				<table style="width: 100%">
 					<thead><th>Name (Hit Dice)</th><th>Damage</th><th>Max HP</th></thead>
 					<tr><td colspan="4">PCs</td></tr>
@@ -191,16 +218,23 @@
 					{/each}
 				</table>
 			</div> -->
-		{/if}
+		<!-- {/if} -->
 	</div>
 	<div style="display: flex; justify-content: space-between;" slot="menu">
-		{#if step == 'hp'}
-			<!-- <button on:click|preventDefault={healAll}>Heal all<Droplets /></button>
+		<!-- {#if step == 'hp'} -->
+		<!-- <button on:click|preventDefault={healAll}>Heal all<Droplets /></button>
 			<button on:click={submit}>Submit</button> -->
-		{:else}
-			<button on:click|preventDefault={rollInitiative}>Roll all<DicesIcon /></button>
-			<button on:click={submit}>Submit</button>
-		{/if}
+		<!-- {:else} -->
+		<button on:click|preventDefault={rollInitiative}><DicesIcon />Roll all</button>
+		<button on:click={submit}>Submit</button>
+		<button
+			on:click={() => {
+				// smartName();
+				console.error('This does not yet work');
+				submit();
+			}}>Submit and AutoName</button
+		>
+		<!-- {/if} -->
 	</div>
 </Dialog>
 

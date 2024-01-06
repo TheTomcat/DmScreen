@@ -18,11 +18,11 @@
 	// import BouncingText from '$lib/components/textEffects/BouncingText.svelte';
 	// import GlitchText from '$lib/components/textEffects/GlitchText.svelte';
 	// import SquiggleText from '$lib/components/textEffects/SquiggleText.svelte';
-	let session_id = 1;
+	let room_id = $page.params.room_id;
 	let ws: wsReciever;
 	let activeParticipantImage: ImageURL | undefined;
 	onMount(() => {
-		ws = new wsReciever(`/live/socket/${session_id}`);
+		ws = new wsReciever(`/live/socket/${room_id}`);
 		initialise();
 	});
 	onDestroy(() => {
@@ -47,7 +47,9 @@
 	}
 </script>
 
-{#if $playerStateStore}
+{#if !room_id}
+	Invalid Room Id
+{:else if $playerStateStore}
 	<!-- {@debug $playerStateStore} -->
 	{#if !$playerStateStore.background_image_display}
 		<BackgroundEffect n={50} />
@@ -105,11 +107,13 @@
 					<h2>
 						{$combat.participants.find(
 							(p) =>
+								$activeParticipant &&
+								$playerStateStore.combat &&
 								p.participant_id ==
-								get_next_PC(
-									$activeParticipant.participant_id,
-									$playerStateStore.combat.participants
-								).next_participant_id
+									get_next_PC(
+										$activeParticipant.participant_id,
+										$playerStateStore.combat.participants
+									).next_participant_id
 						)?.name}
 					</h2>
 				{/if}

@@ -17,6 +17,7 @@
 		Droplets,
 		Eye,
 		EyeOff,
+		MessageSquareCode,
 		Pencil,
 		PlusSquare,
 		RefreshCw,
@@ -26,16 +27,17 @@
 		SwordsIcon,
 		X
 	} from 'lucide-svelte';
-	import type { components } from '$lib/api/v1';
 	import type { Participant, Entity, Combat } from '../../app';
 	import client from '$lib/api/index';
 	import { combat } from '$lib/ws';
 
-	import { createEventDispatcher, tick } from 'svelte';
+	import { createEventDispatcher, onDestroy, tick } from 'svelte';
 	import type { wsController } from '$lib/ws';
 	import Autocomplete from './Autocomplete.svelte';
 	import EditableText from './EditableText.svelte';
 	import Dialog from './Dialog.svelte';
+	import { entityHasData, parseAndCreateCounters } from '$lib/jsonschema';
+	import Statblock from './new/EntityDisplay/Statblock.svelte';
 
 	// type Participant = components['schemas']['Participant'];
 	// type Combat = components['schemas']['Combat'];
@@ -61,6 +63,11 @@
 
 	let newCombatantDialog: Dialog;
 
+	let entities: Entity[] = [];
+	let statblockParticipant: Participant;
+	let statblockEntity: Entity;
+	let statblockDialog: Dialog;
+
 	const Conditions = [
 		'Blinded',
 		'Charmed',
@@ -77,21 +84,60 @@
 		'Exhausted'
 	];
 
+	const getUniqueEntityIds = (combat: Combat): number[] => {
+		// @ts-ignore
+		return [...new Set(combat.participants.map((p) => p.entity_id) || [])].filter((n) => n);
+	};
+
+	const loadEntitiesFromCombat = (combat: Combat) => {
+		if (!combat) return;
+		// return .map(entity_id => getEntity(entity_id)).filter(n=>n)
+
+		getUniqueEntityIds(combat).forEach((entity_id) => {
+			getEntity(entity_id).then((response) => {
+				if (response && entityHasData(response)) {
+					entities = [...entities, response];
+				}
+			});
+		});
+	};
+
+	const participantHasEntityData = (p: Participant): boolean => {
+		if (!p.entity_id) return false;
+		if (!entities) return false;
+		// console.log(entities);
+		return !!entities.find((e) => {
+			return e.entity_id === p.entity_id; //&& entityHasData(e);
+		});
+	};
+
 	const getEntities = async (q: string) => {
 		return client.GET('/entity/', { params: { query: { name: q, size: 15 } } }).then((response) => {
 			if (!response.data) return [];
 			return response.data.items;
 		});
 	};
+	const getEntity = async (entity_id: number) => {
+		return (
+			client
+				.GET('/entity/{entity_id}', { params: { path: { entity_id } } })
+				// @ts-ignore
+				.then((response) => {
+					if (!response.data) return;
+					return { ...response.data, data: JSON.parse(response.data?.data || '{}') };
+				})
+		);
+	};
 	const extractId = (t: Entity): number => t.entity_id;
 	const extractName = (t: Entity): string => (t.image_id !== null ? '+' : '') + t.name || '';
 	const addNewCombatant = (e: CustomEvent<Entity>) => {
 		if (!$combat) return;
+		console.log($combat.combat_id, e.detail);
 		controller.addParticipantFromEntity($combat.combat_id, e.detail);
-		console.log(e);
+		// console.log(e);
 	};
 	const addNewQuickCombatant = (e: CustomEvent<{ value: string }>) => {
-		console.log(e);
+		// console.log(e);
 	};
 	const showDamagingDialog = (damagingMode: boolean, participant: Participant) => {
 		damaging = damagingMode;
@@ -124,6 +170,14 @@
 		conditionsDialog.open();
 		tick().then(() => conditionInputField.focus());
 	};
+	const showStatblockDialog = (participant: Participant) => {
+		statblockParticipant = participant;
+		let index = entities.findIndex((e) => e.entity_id == participant.entity_id);
+		if (index == -1) return;
+		console.log('going');
+		statblockEntity = entities[index];
+		statblockDialog.open();
+	};
 	const setConditions = () => {
 		console.log(conditions);
 		if (conditionsChanged) {
@@ -138,12 +192,24 @@
 	const onDamageKeyDown = (e: KeyboardEvent) => {
 		if (e.key === 'Enter') applyDamage();
 	};
+
+	let unsubscribe = combat.subscribe((value) => {
+		if (value) loadEntitiesFromCombat(value);
+	});
+
+	onDestroy(unsubscribe);
+
+	$: {
+		if (entities && $combat && $combat.participants)
+			parseAndCreateCounters($combat?.participants, entities);
+	}
 </script>
 
 <table style="width: 100%; border-spacing: 0;" class:inactive={!$combat?.is_active}>
 	<thead>
 		<th><div class="icon"><Dices /></div></th>
 		<th><div class="icon"><Shield /></div></th>
+		<th />
 		<th />
 		<th />
 		<th>Name</th>
@@ -159,6 +225,7 @@
 				<tr
 					animate:flip
 					class:activeparticipant={participant.participant_id == $combat.active_participant_id}
+					class:isHidden={!participant.is_visible}
 					class:PC={participant.is_PC}
 				>
 					<td>
@@ -200,11 +267,8 @@
 
 					<td>
 						<div style="display: flex; flex-direction: row; justify-content: center;">
-							<span
+							<button
 								class="icon"
-								style="position: relative; right: 0;"
-								role="button"
-								tabindex="0"
 								on:click={() => {
 									controller
 										.setIsVisible(participant.participant_id, !participant.is_visible)
@@ -213,21 +277,11 @@
 											dispatch('combat_updated', { combat: $combat });
 										});
 								}}
-								on:keyup={() => {
-									controller
-										.setIsVisible(participant.participant_id, !participant.is_visible)
-										.then(() => {
-											if (!$combat) return;
-											dispatch('combat_updated', { combat: $combat });
-										});
-								}}
 							>
-								{#if participant.is_visible}<Eye />{:else}<EyeOff />{/if}
-							</span>
-							<span
+								{#if participant.is_visible}<Eye />{:else}<EyeOff color={'grey'} />{/if}
+							</button>
+							<button
 								class="icon"
-								role="button"
-								tabindex="0"
 								style="position: relative; right: 0;"
 								on:click={() => {
 									controller
@@ -237,20 +291,22 @@
 											dispatch('combat_updated', { combat: $combat });
 										});
 								}}
-								on:keyup={() => {
-									controller
-										.setHasReaction(participant.participant_id, !participant.has_reaction)
-										.then(() => {
-											if (!$combat) return;
-											dispatch('combat_updated', { combat: $combat });
-										});
-								}}
 							>
-								{#if participant.has_reaction}<RefreshCw />{:else}<RefreshCwOff />{/if}
-							</span>
+								{#if participant.has_reaction}<RefreshCw
+										color={'forestgreen'}
+									/>{:else}<RefreshCwOff color={'maroon'} />{/if}
+							</button>
 						</div>
 					</td>
-
+					<td>
+						<!-- {#await Promise.all(loadEntitiesFromCombat($combat)) then } 
+							 -->
+						{#if entities && participantHasEntityData(participant)}
+							<button class="icon" on:click={() => showStatblockDialog(participant)}>
+								<MessageSquareCode />
+							</button>
+						{/if}
+					</td>
 					<td>
 						<span class:dead={is_dead(participant)} class:player={participant.is_PC}>
 							<EditableText
@@ -275,7 +331,8 @@
 									<Skull />
 								</div>
 							{/if}
-							{#each participant.conditions.split(',') as condition}{condition}{/each}
+							{participant.conditions.split(',').join(', ')}
+							<!-- {#each participant.conditions.split(',') as condition}{condition}{/each} -->
 						</div>
 					</td>
 
@@ -317,10 +374,9 @@
 						</div>
 					</td>
 					<td
-						><div
+						><button
 							class="icon"
-							role="button"
-							tabindex="0"
+							style="padding: var(--size-1);"
 							on:click={() => {
 								if ($combat?.active_participant_id == participant.participant_id) {
 									let p = get_next_alive_participant_id(
@@ -339,7 +395,7 @@
 							}}
 						>
 							<X />
-						</div></td
+						</button></td
 					>
 				</tr>
 			{/each}
@@ -348,7 +404,7 @@
 	<tfoot>
 		<tr
 			><td colspan="3">Add Combatant</td>
-			<td colspan="3"
+			<td colspan="4"
 				><Autocomplete
 					getData={getEntities}
 					{extractId}
@@ -363,6 +419,10 @@
 		</tr>
 	</tfoot>
 </table>
+<!-- {JSON.stringify(entities)} -->
+<Dialog mode="mega" showMenu={false} bind:this={statblockDialog}>
+	<Statblock slot="content" entity={statblockEntity} participant={statblockParticipant} />
+</Dialog>
 
 <Dialog mode="mega" showMenu={false} bind:this={damageDialog}>
 	<div slot="content">
@@ -477,6 +537,12 @@
 		background-color: transparent;
 		/* border: 2px solid red; */
 	}
+	tr.isHidden {
+		background-color: #011;
+	}
+	tr.isHidden > td {
+		background: unset;
+	}
 	tr.activeparticipant > td {
 		background: unset;
 	}
@@ -494,6 +560,10 @@
 	.icon {
 		display: flex;
 		justify-content: center;
+		padding: unset;
+		background: unset;
+		border: unset;
+		box-shadow: unset;
 	}
 	.circle {
 		position: relative;

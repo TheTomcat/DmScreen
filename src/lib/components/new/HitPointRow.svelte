@@ -49,7 +49,7 @@
 	<td>{participant.name}</td>
 {/if}
 <td>
-	<input class="initroller" bind:value={participant.damage} type="number" />
+	<input class="initroller" bind:value={participant.damage} type="number" on:change={onHPChange} />
 	<button
 		on:click|preventDefault={() => {
 			dispatch('hitpoint_update', {

@@ -1,9 +1,49 @@
 <script lang="ts">
-	import type { Entity } from '../../../app';
+	import type { Entity, Participant } from '../../../app';
 	import Counter from './Counter.svelte';
-	import EntityBlock from './EntityBlock.svelte';
+
+	import {
+		type Creature,
+		renderSize,
+		renderType,
+		renderBlock,
+		renderAC,
+		renderHP,
+		renderSpeed,
+		renderCR,
+		renderLanguages,
+		renderSaves,
+		renderSkills,
+		renderSenses,
+		renderVulnerabilities,
+		renderResistances,
+		renderImmunities,
+		renderConditionImmunities,
+		renderTraits,
+		renderSpellcasting,
+		renderActions,
+		renderLegendaryActions,
+		makeArray,
+		makeMiniBlock,
+		makeBlock
+	} from '$lib/jsonschema';
+	import { renderModifierFromAbilityScore } from '$lib';
+	import { type CounterType, counters, createCounter } from '$lib/stores/counterStore';
+
+	import InjectableHtmlTag from './InjectableHTMLTag.svelte';
+	import CounterConsume from './EntityDisplay/CounterConsume.svelte';
 
 	export let entity: Entity;
+	let participant: Participant = { participant_id: 1, combat_id: 1 } as Participant;
+
+	let renderData: Creature;
+	$: {
+		console.log('onchange');
+		if (entity) {
+			renderData = entity.data as unknown as Creature;
+			participant = { participant_id: entity.entity_id, combat_id: 1 } as Participant;
+		}
+	}
 </script>
 
 {#if !entity}
@@ -12,6 +52,7 @@
 	<div class="container">
 		<div class="block">
 			<h2>{entity.name}</h2>
+			<span>{renderSize(renderData)} {renderType(renderData)}</span>
 			<div>
 				Image: {entity.image_id}
 			</div>
@@ -20,65 +61,72 @@
 			</div>
 		</div>
 		<div class="block grid2">
-			<div>AC</div>
-			<div>{entity.ac}</div>
-			<div>CR</div>
-			<div>{entity.cr}</div>
-			<div>HP</div>
-			<div>{entity.hit_dice}</div>
+			{@html renderBlock(renderData, renderAC, makeArray('AC'))}
+			{@html renderBlock(renderData, renderCR, makeArray('CR'))}
+			{@html renderBlock(renderData, renderHP, makeArray('HP'))}
+			{@html renderBlock(renderData, renderSpeed, makeArray('Speed'))}
+			{@html renderBlock(renderData, renderLanguages, makeArray('Languages'))}
 		</div>
 		<div class="block stats">
-			<div><span>Str</span><input type="number" /></div>
-			<div><span>Dex</span><input type="number" /></div>
-			<div><span>Con</span><input type="number" /></div>
-			<div><span>Int</span><input type="number" /></div>
-			<div><span>Wis</span><input type="number" /></div>
-			<div><span>Cha</span><input type="number" /></div>
+			<div><span>Str</span>{renderData.str} ({renderModifierFromAbilityScore(renderData.str)})</div>
+			<div><span>Dex</span>{renderData.dex} ({renderModifierFromAbilityScore(renderData.dex)})</div>
+			<div><span>Con</span>{renderData.con} ({renderModifierFromAbilityScore(renderData.con)})</div>
+			<div><span>Int</span>{renderData.int} ({renderModifierFromAbilityScore(renderData.int)})</div>
+			<div><span>Wis</span>{renderData.wis} ({renderModifierFromAbilityScore(renderData.wis)})</div>
+			<div><span>Cha</span>{renderData.cha} ({renderModifierFromAbilityScore(renderData.cha)})</div>
 		</div>
-		<div class="block">
-			<h5>Saves</h5>
-			<Counter title="Breath Weapon" total={5} numConsumed={3} />
-		</div>
-		<div class="block">
-			<h5>Skills</h5>
-		</div>
-		<EntityBlock mode="value" heading="Speed" data={[{ title: 'Walk', desc: '30' }]} />
-		<div class="block">
-			<h5>Speed</h5>
-		</div>
-		<div class="block">
-			<h5>Senses</h5>
-		</div>
-		<div class="block">
-			<h5>Damage Vulnerabilities</h5>
-		</div>
-		<div class="block">
-			<h5>Damage Resistances</h5>
-		</div>
-		<div class="block">
-			<h5>Damage Immunities</h5>
-		</div>
-		<div class="block">
-			<h5>Condition Immunities</h5>
-		</div>
-		<EntityBlock mode="simple" heading="Languages" data={[{ title: 'Common', desc: undefined }]} />
-
-		<div class="block">
-			<h5>Traits</h5>
-		</div>
-		<EntityBlock
-			heading="Actions"
-			mode="block"
-			data={[{ title: 'Multiattack', desc: 'The blank makes two attacks with its things' }]}
+		<hr />
+		{@html renderBlock(renderData, renderSaves, makeMiniBlock('Saves'))}
+		{@html renderBlock(renderData, renderSkills, makeMiniBlock('Skills'))}
+		{@html renderBlock(renderData, renderSenses, makeMiniBlock('Senses'))}
+		{@html renderBlock(renderData, renderVulnerabilities, makeMiniBlock('Damage Vulnerabilities'))}
+		{@html renderBlock(renderData, renderResistances, makeMiniBlock('Damage Resistances'))}
+		{@html renderBlock(renderData, renderImmunities, makeMiniBlock('Damage Immunities'))}
+		{@html renderBlock(
+			renderData,
+			renderConditionImmunities,
+			makeMiniBlock('Condition Immunities')
+		)}
+		{@html renderBlock(renderData, renderTraits, makeBlock('Traits'))}
+		{@html renderBlock(renderData, renderSpellcasting, makeBlock('Spells'))}
+		{@html renderBlock(renderData, renderActions, makeBlock('Actions'))}
+		{@html renderBlock(
+			renderData,
+			renderLegendaryActions,
+			makeBlock('Legendary Actions'),
+			participant
+		)}
+		<InjectableHtmlTag
+			html={renderBlock(renderData, renderLegendaryActions, makeBlock('Legendary Actions'))}
+			rules={[
+				{
+					regex: RegExp(/\<\<([\w\-]+)(?::([\w\d]+))?\>\>/, 'g'),
+					component: CounterConsume,
+					props: {}
+				}
+			]}
 		/>
-		<EntityBlock mode="block" heading="Bonus Actions" data={[]} />
-		<EntityBlock mode="block" heading="Reactions" data={[]} />
-		<EntityBlock mode="block" heading="Legendary Actions" data={[]} />
-		<EntityBlock mode="block" heading="Mythic Actions" data={[]} />
+		{#each $counters as counter}
+			<Counter id={counter.id} />
+			{JSON.stringify(counter)}
+		{/each}
 	</div>
 {/if}
 
 <style>
+	.container :global(*) {
+		max-inline-size: unset;
+	}
+	.container :global(hr) {
+		margin-block: unset;
+	}
+	.container :global(.dc) {
+		text-decoration: underline;
+		text-decoration-style: dotted;
+	}
+	.container :global(.heading) {
+		padding-right: var(--size-3);
+	}
 	.container {
 		display: flex;
 		flex-direction: column;
@@ -88,6 +136,7 @@
 		display: flex;
 		flex-direction: row;
 		gap: var(--size-3);
+		justify-content: center;
 	}
 	.stats > div {
 		display: flex;

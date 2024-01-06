@@ -39,7 +39,8 @@
 	"dependencies": {
 		"@fontsource/manrope": "^5.0.17",
 		"@picocss/pico": "^1.5.10",
-		"lucide-svelte": "^0.290.0",
+		"dropzone": "6.0.0-beta.2",
+		"lucide-svelte": "^0.303.0",
 		"open-props": "^1.6.10",
 		"openapi-fetch": "^0.8.1",
 		"openapi-typescript": "^6.7.0",

@@ -2,6 +2,7 @@ import type { Combat, Entity, Participant, ParticipantUpdate } from "../app";
 import { writable, type Writable, derived } from "svelte/store";
 import client from "$lib/api/index";
 import { roll, rollDice } from "$lib";
+import { entityHasData } from "./jsonschema";
 
 let annoucementTimerId: number;
 
@@ -544,6 +545,9 @@ export class wsController {
     ////////// to the client. Be sure to call updateCombat afterwards, as this is not automatic. 
 
     async updateParticipant(participant_id: number, updated_participant: ParticipantUpdate) {
+        // @ts-ignore This is because of a hack that I implemented in the backend, where data is sometimes present and sometimes not.
+        // Ideally, when this function is called, participant.data should not be present. 
+        delete updated_participant?.data;
         let response = await client.PATCH('/participant/{participant_id}', {
             params: { path: { participant_id } },
             body: { ...updated_participant }

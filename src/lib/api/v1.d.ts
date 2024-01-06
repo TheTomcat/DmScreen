@@ -341,6 +341,8 @@ export interface components {
       source_page?: number | null;
       /** Entity Id */
       entity_id: number;
+      /** Data */
+      data: string | null;
     };
     /** EntityCreate */
     EntityCreate: {

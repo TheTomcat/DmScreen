@@ -3,11 +3,12 @@
 	// import { sessionStore, type Session, refresh } from '$lib/stores/sessionStore.js';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, tick } from 'svelte';
 	import {
 		ArrowLeft,
 		ArrowRight,
 		ChevronRightSquare,
+		ClipboardCopy,
 		Cross,
 		Dices,
 		DicesIcon,
@@ -44,7 +45,7 @@
 		sort_participants_by_id,
 		sort_participants_naive
 	} from '$lib';
-	import type Dialog from '$lib/components/Dialog.svelte';
+	import Dialog from '$lib/components/Dialog.svelte';
 	import InitiativeRoller from '$lib/components/InitiativeRoller.svelte';
 	import CombatInitiativeOrder from '$lib/components/CombatInitiativeOrder.svelte';
 	import CombatSetup from '$lib/components/new/CombatSetup.svelte';
@@ -53,21 +54,31 @@
 
 	import Pagination from '$lib/components/Pagination.svelte';
 	import PaginationStub from '$lib/components/PaginationStub.svelte';
+	import {
+		dispatchGeneralCounterEvent,
+		dispatchParticipantCounterEvent
+	} from '$lib/stores/counterStore';
 
 	let ws: wsController;
 	let debugmode: boolean = true;
 	let manualMode: boolean = false;
 	let initDialog: CombatSetup;
-	let step: 'initiative' | 'hp' = 'hp';
+	// let step: 'initiative' | 'hp' = 'hp';
 	let fresh: boolean = true;
 
-	let session_id: number = parseInt($page.params.session_id);
+	let session_id: string = $page.params.session_id;
 
 	let currentPage: number = 1;
 	let numPages: number = 1;
 
+	let clientURL: string;
+	let urlBox: Dialog;
+	let urlBoxInputField: HTMLInputElement;
+
 	onMount(() => {
 		ws = new wsController(`/live/socket/${session_id}`);
+		// console.log($page.url.origin);
+		clientURL = `${$page.url.origin}/room/${session_id}`;
 		initialise();
 	});
 
@@ -114,6 +125,16 @@
 		ws.updateParticipants($combat.combat_id, e.detail.participants);
 	};
 
+	const onChangeParticipantsNames = (
+		e: CustomEvent<{ participants: { participant_id: number; name: string }[] }>
+	) => {
+		console.log('TEST');
+		e.detail.participants.forEach((p) => {
+			ws.updateParticipant(p.participant_id, { name: p.name });
+		});
+		if ($combat) ws.updateCombat({ combat: $combat });
+	};
+
 	const onSubmitForm = () => {
 		if (!$combat) return;
 		ws.clearAnnouncement();
@@ -135,14 +156,14 @@
 			ws.updateCombat({ combat: e.detail.combat });
 		}
 	};
-	const rollHP = () => {
-		step = 'hp';
-		if (!$combat) return;
-		// ws.announce({ message: 'Roll for Initiative', timeout: -1, display: true });
-		initDialog.open($combat.participants);
-	};
+	// const rollHP = () => {
+	// 	step = 'hp';
+	// 	if (!$combat) return;
+	// 	// ws.announce({ message: 'Roll for Initiative', timeout: -1, display: true });
+	// 	initDialog.open($combat.participants);
+	// };
 	const commenceCombat = () => {
-		step = 'initiative';
+		// step = 'initiative';
 		if (!$combat) return;
 		ws.announce({ message: 'Roll for Initiative', timeout: -1, display: true });
 		initDialog.open($combat.participants);
@@ -167,14 +188,23 @@
 	<div class="sessioncontainer">
 		<div class="sessionheader">
 			<h1>Session Driver</h1>
-			<div><span>{ws && ws.ws.readyState}</span>Connection</div>
+			<div>
+				<button
+					on:click={() => {
+						urlBox.open();
+						tick().then(() => {
+							urlBoxInputField.select();
+						});
+					}}>Copy Client URL</button
+				>
+			</div>
 		</div>
 		<div class="main">
 			<!-- <div style="display: flex; justify-content: space-between;">
 				<h3>Session Controls</h3>
 			</div> -->
 			<div style="display: grid; grid-template-columns: auto 1fr;">
-				<div>Announce:</div>
+				<div class="verticalcenter">Announce:</div>
 				<div>
 					<input bind:value={announcement} placeholder="Announce Message" />
 					<button on:click={announce}>Announce<Megaphone /></button>
@@ -187,7 +217,7 @@
 						>Clear Announcement<MegaphoneOff /></button
 					>
 				</div>
-				<div>Backdrop</div>
+				<div class="verticalcenter">Backdrop:</div>
 				<div>
 					<button
 						class:checked={$playerStateStore.background_image_display}
@@ -214,8 +244,29 @@
 						Cycle Background <RefreshCw />
 					</button>
 					<input placeholder="Timeout" bind:value={$playerStateStore.background_image_timeout} />
+					<input
+						placeholder="Image ID"
+						bind:value={$playerStateStore.background_image_id}
+						on:blur={() => {
+							if ($playerStateStore.background_image_id) {
+								ws.setBackgroundImage({
+									cycle: false,
+									display: $playerStateStore.background_image_display,
+									timeout: $playerStateStore.background_image_timeout,
+									image_id: $playerStateStore.background_image_id
+								});
+							} else {
+								ws.setBackgroundImage({
+									cycle: $playerStateStore.background_image_cycle,
+									display: $playerStateStore.background_image_display,
+									timeout: $playerStateStore.background_image_timeout,
+									image_id: $playerStateStore.background_image_id
+								});
+							}
+						}}
+					/>
 				</div>
-				<div>Message</div>
+				<div class="verticalcenter">Message:</div>
 				<div>
 					<button
 						class:checked={$playerStateStore.message_display}
@@ -253,7 +304,7 @@
 					</button>
 					<input placeholder="Timeout" bind:value={$playerStateStore.message_timeout} />
 				</div>
-				<div>Combat</div>
+				<div class="verticalcenter">Combat:</div>
 				<div>
 					<button
 						class:checked={$playerStateStore.combat_display}
@@ -264,7 +315,7 @@
 						}}>Show Combat <Swords /></button
 					>
 				</div>
-				<div>Handout</div>
+				<div class="verticalcenter">Handout:</div>
 				<div>
 					<button
 						class:checked={$playerStateStore.handout_display}
@@ -344,27 +395,31 @@
 						> -->
 					{:else}
 						<!-- <button disabled><PauseOctagon /> Suspend Combat</button> -->
-						<button
-							on:click={() => {
-								if ($combat && $combat.active_participant_id) {
-									let p = get_next_alive_participant_id(
-										$combat?.active_participant_id,
-										$combat?.participants
-									);
-									if (p.have_looped) {
+						<div style="display: flex; justify-content: space-between; align-items: center;">
+							<button
+								on:click={() => {
+									if ($combat && $combat.active_participant_id) {
+										let p = get_next_alive_participant_id(
+											$combat?.active_participant_id,
+											$combat?.participants
+										);
+										if (p.have_looped) {
+											dispatchGeneralCounterEvent('round');
+										}
+										dispatchParticipantCounterEvent(p.next_participant_id, 'turn');
+										ws.advanceCombat({
+											...p
+										});
 									}
-									ws.advanceCombat({
-										...p
-									});
-								}
-							}}><ChevronRightSquare /> Advance Combat</button
-						>
-						<div>
-							Round {$combat.round}
-						</div>
-						<div>
-							<button on:click={healAll}><Cross /></button>
-							<button on:click={commenceCombat}><Dices /></button>
+								}}><ChevronRightSquare /> Advance Combat</button
+							>
+							<div>
+								Round {$combat.round}
+							</div>
+							<div>
+								<button on:click={healAll}><Cross /></button>
+								<button on:click={commenceCombat}><Dices /></button>
+							</div>
 						</div>
 					{/if}
 					<div class="init">
@@ -389,14 +444,32 @@
 
 {#if $combat && $combat.participants}
 	<CombatSetup
-		bind:step
 		bind:this={initDialog}
 		on:changeParticipant={onChangeParticipants}
+		on:changeParticipantNames={onChangeParticipantsNames}
 		on:submitForm={onSubmitForm}
 	/>
 {/if}
+<Dialog mode={'mini'} bind:this={urlBox}>
+	<div slot="content" style="display:flex; align-items: center; justify-content: flex-start;">
+		<input class="boxbutton" bind:value={clientURL} readonly={true} bind:this={urlBoxInputField} />
+		<button
+			class="boxbutton"
+			on:click|preventDefault={() => {
+				urlBoxInputField.select();
+				document.execCommand('copy');
+				urlBox.close();
+			}}><ClipboardCopy /></button
+		>
+	</div>
+</Dialog>
 
 <style>
+	.verticalcenter {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+	}
 	.checked {
 		background-color: var(--brand-background);
 	}
