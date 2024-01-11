@@ -177,9 +177,9 @@ export interface paths {
     /** Update Image */
     patch: operations["update_image"];
   };
-  "/image/{image_id}/data": {
+  "/image/upload": {
     /** Upload Image */
-    patch: operations["upload_image"];
+    post: operations["upload_image"];
   };
   "/image/{image_id}/tag": {
     /** Set Tags */
@@ -245,10 +245,10 @@ export interface components {
     /** Body_upload_image */
     Body_upload_image: {
       /**
-       * Imdata
+       * Image File
        * Format: binary
        */
-      imdata: string;
+      image_file: string;
     };
     /** Combat */
     Combat: {
@@ -2068,11 +2068,6 @@ export interface operations {
   };
   /** Upload Image */
   upload_image: {
-    parameters: {
-      path: {
-        image_id: number;
-      };
-    };
     requestBody: {
       content: {
         "multipart/form-data": components["schemas"]["Body_upload_image"];
