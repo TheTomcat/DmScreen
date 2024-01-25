@@ -159,6 +159,29 @@ export const remainingHp = (participant: Participant): number => {
     return participant.max_hp - participant.damage;
 };
 
+
+
+export function makeCancelable<T>(promise: Promise<T>) {
+    let hasCanceled_ = false;
+
+    const wrappedPromise: Promise<T> = new Promise((resolve, reject) => {
+        promise.then((val) =>
+            hasCanceled_ ? reject({ isCanceled: true }) : resolve(val)
+        );
+        promise.catch((error) =>
+            hasCanceled_ ? reject({ isCanceled: true }) : reject(error)
+        );
+    });
+
+    return {
+        promise: wrappedPromise,
+        cancel() {
+            hasCanceled_ = true;
+        },
+    };
+};
+
+
 export const smartName = (current_participant_id: number, participants: Participant[]): string => {
     let name = participants.find(p => p.participant_id == current_participant_id)?.name;
     if (!name) return "";

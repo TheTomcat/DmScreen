@@ -2,6 +2,10 @@
 	import { X } from 'lucide-svelte';
 	import type { Tag } from '../../app';
 	import { createEventDispatcher } from 'svelte';
+	import { cn } from '$lib/utils';
+
+	let className: string = '';
+	export { className as class };
 	export let tag: Tag;
 	export let interactive: boolean = true;
 	export let highlight: boolean = false;
@@ -10,47 +14,25 @@
 </script>
 
 <button
-	class="tagbutton"
-	class:interactive
-	class:small
-	class:highlight
+	class={cn(
+		'flex items-center gap-1 bg-orange-400 text-black rounded-full shadow-gray-700 shadow-md m-2 cursor-default pl-3 pr-2 py-1',
+		interactive && 'cursor-default',
+		small && 'text-sm px-2 py-0 m-1',
+		highlight && 'bg-purple-500',
+		className
+	)}
 	on:click={() => dispatch('click')}
 >
-	{tag.tag}
+	<span>
+		{tag.tag}
+	</span>
 	{#if interactive}
-		<button class="close" class:interactive tabindex="0" on:click={() => dispatch('clickclose')}>
-			<X />
+		<button
+			class={cn('close', interactive && 'cursor-pointer')}
+			tabindex="0"
+			on:click={() => dispatch('clickclose')}
+		>
+			<X class="w-4 h-4 ml-1" />
 		</button>
 	{/if}
 </button>
-
-<style>
-	.small {
-		font-size: small;
-	}
-	button {
-		background-color: var(--brand);
-		color: black;
-		border-radius: var(--radius-4);
-		box-shadow: var(--shadow-4);
-		margin-inline: var(--size-1);
-		cursor: default;
-	}
-	button.close {
-		border: unset;
-		padding: unset;
-	}
-	.highlight {
-		background-color: var(--brand-background);
-	}
-	.close.interactive {
-		cursor: pointer;
-	}
-
-	button.interactive {
-		cursor: default;
-	}
-	button.interactive {
-		cursor: default;
-	}
-</style>

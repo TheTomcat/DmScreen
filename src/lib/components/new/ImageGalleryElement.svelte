@@ -1,37 +1,47 @@
 <script lang="ts">
 	import type { components } from '$lib/api/v1';
 	import { capitalise } from '$lib';
+	import { createEventDispatcher } from 'svelte';
 
 	import ImageTag from '$lib/components/ImageTag.svelte';
+	import { Button } from '$lib/components/ui/button';
 
 	type Image = components['schemas']['ImageURL'];
+	type Tag = components['schemas']['Tag'];
 
-	export let image: Image | null;
-	export let clickAction = (e: Image | null) => {};
-	let state: 'loading' | 'error' | 'done' = 'done';
+	export let image: Image | undefined;
+	export let selectedTags: Tag[];
+	// export let clickAction = (e: Image | null) => {};
+
+	const dispatch = createEventDispatcher<{ image_click: { image: Image } }>();
+	// let state: 'loading' | 'error' | 'done' = 'done';
 </script>
 
 {#if image}
 	<div class="gallery-item">
+		<!-- <Button -->
+		<img
+			class="portrait"
+			src={`/api/${image.thumbnail_url}?width=240`}
+			alt={image.name}
+			width={image.dimension_x}
+			height={image.dimension_y}
+			on:click={() => {
+				if (!image) return;
+				dispatch('image_click', { image });
+			}}
+		/>
+
 		<h3 class="heading">{image.name}</h3>
-		<div class="image">
-			{#if state === 'loading'}
-				<div class="loading" />
-			{:else if state === 'done'}
-				<img
-					class="portrait"
-					src={`/api/${image.thumbnail_url}?width=500`}
-					alt={image.name}
-					width={image.dimension_x}
-					height={image.dimension_y}
-					on:click={() => clickAction(image)}
-				/>
-			{/if}
-		</div>
 		<div class="information">
 			<div class="tags">
 				{#each image.tags as tag (tag.tag_id)}
-					<ImageTag {tag} interactive={false} />
+					<ImageTag
+						{tag}
+						interactive={false}
+						highlight={!!selectedTags.find((t) => t.tag_id == tag.tag_id)}
+						small={true}
+					/>
 				{/each}
 			</div>
 			<div class="imid">
@@ -46,7 +56,6 @@
 			</div>
 		</div>
 	</div>
-	<!-- <div class="body" class:loading={state === 'loading'}> -->
 {/if}
 
 <style>
@@ -173,5 +182,67 @@
 		100% {
 			background-position: 0% 50%;
 		}
+	}
+	.filter {
+		padding: var(--size-3);
+		margin: var(--size-3);
+		border-radius: var(--radius-3);
+		border: var(--border-size-2) solid var(--gray-8);
+	}
+	.gallery {
+		display: grid;
+		/* grid-auto-flow: dense; */
+		gap: var(--size-5);
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+		padding: var(--size-3);
+		container-type: inline-size;
+		grid-auto-rows: 200px auto auto;
+		/* flex-direction: row;
+		justify-content: space-between;
+		flex-wrap: wrap;
+		gap: var(--size-5); */
+	}
+	.gallery-item {
+		background-color: var(--surface-4);
+		border-radius: var(--radius-3);
+		grid-row: span 3;
+		grid-template-rows: subgrid;
+		display: grid;
+		gap: var(--size-3);
+		overflow: hidden;
+		transition: all 0.2s ease-in-out;
+	}
+	.gallery-item:hover {
+		transform: scale(1.1);
+		transition: all 0.2s ease-in-out;
+	}
+	.gallery-item h3 {
+		font-size: larger;
+	}
+	.gallery-item > :not(img) {
+		margin-inline: var(--size-2);
+	}
+	.gallery-item > img {
+		border-bottom-left-radius: 0;
+		border-bottom-right-radius: 0;
+		overflow: hidden;
+		object-fit: cover; /*contain*/
+		height: 200px;
+	}
+	.palette {
+		display: flex;
+	}
+	.circle {
+		position: relative;
+
+		right: 0;
+		border-radius: 50%;
+		margin: var(--size-1);
+		height: var(--size-3);
+		width: var(--size-3);
+		transform: scale(1);
+		/* background: rgba(255, 177, 66, 1); */
+		border: solid 1px var(--text-2);
+		box-shadow: var(--shadow-2);
 	}
 </style>

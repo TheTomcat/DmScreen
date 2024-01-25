@@ -5,7 +5,9 @@ import type { components } from "$lib/api/v1";
 declare global {
 	namespace App {
 		// interface Error {}
-		// interface Locals {}
+		interface Locals {
+			user: { username: string, name: string, role: string, fb: string, image: number }
+		}
 		// interface PageData {}
 		// interface Platform {}
 	}
@@ -25,6 +27,7 @@ type Participant = components['schemas']['Participant'];
 type ParticipantUpdate = components['schemas']['ParticipantUpdate'];
 type Combat = components['schemas']['Combat'];
 type Session = components['schemas']['Session'];
+type Collection = components['schemas']['Collection'];
 
 export type _ImageMatch = {
 	image: Image;

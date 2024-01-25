@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Combat, Initiative } from '../app';
-	import InitiativeRow from './InitiativeRow.svelte';
-	import { combat, updateParticipant } from '../stores/combatStore';
+	import InitiativeRow from '../InitiativeRow.svelte';
+	import { combat, updateParticipant } from '../../stores/combatStore';
 	// export let combat: Combat;
 	// export let updateParticipant: Function;
 	// let initiatives: Initiative[];

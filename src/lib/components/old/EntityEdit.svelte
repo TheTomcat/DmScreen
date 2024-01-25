@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Entity } from '../../app';
+	import type { Entity } from '../../../app';
 	export let entity: Entity = {
 		entity_id: 1,
 		name: 'test',

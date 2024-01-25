@@ -5,6 +5,7 @@
 	import type { components } from '$lib/api/v1';
 	import ImageManager from '$lib/components/new/ImageManager.svelte';
 	import { goto } from '$app/navigation';
+	import { Button } from '$lib/components/ui/button/index.js';
 
 	export let data;
 
@@ -53,34 +54,14 @@
 	};
 </script>
 
-<div class="container">
+<div class="container max-w-[800px] m-auto p-6">
 	{#if state == 'error'}
 		<div class="error">An unexpected error occurred.</div>
 	{:else if image}
 		<ImageManager {image} on:emptysubmit={next} bind:searchInput />
-		<div class="nav">
-			<button on:click={prev} disabled={image_id === 1}>Previous</button><button on:click={next}
-				>Next</button
-			>
+		<div class="nav flex flex-row justify-between">
+			<Button class="w-20" on:click={prev} disabled={image_id === 1}>Previous</Button>
+			<Button class="w-20" on:click={next}>Next</Button>
 		</div>
 	{/if}
 </div>
-
-<style>
-	.container {
-		max-width: 800px;
-		margin: auto;
-		padding: var(--size-3);
-	}
-	.nav {
-		grid-area: nav;
-		display: flex;
-		flex-direction: row;
-		justify-content: space-between;
-	}
-	.nav button {
-		width: var(--size-12);
-		background-color: var(--surface-4);
-		padding: var(--size-3);
-	}
-</style>

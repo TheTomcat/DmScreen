@@ -1,162 +1,133 @@
 <script lang="ts">
-	import type { _ImageMatch, Image, ImageURL, Tag } from '../../../app';
+	import type { ImageURL } from '../../../app';
 
-	import ImageGalleryElement from '$lib/components/new/ImageGalleryElement.svelte';
 	import ImageTag from '$lib/components/ImageTag.svelte';
-	import Autocomplete from '$lib/components/Autocomplete.svelte';
-
-	import client from '$lib/api/index';
-	import type { components } from '$lib/api/v1';
 	import Dialog from '$lib/components/Dialog.svelte';
 	import ImageManager from '$lib/components/new/ImageManager.svelte';
 	import { tick } from 'svelte';
-	import { browser } from '$app/environment';
 	import { capitalise } from '$lib';
+	import ImageGallery from '$lib/components/ImageGallery.svelte';
 	import { flip } from 'svelte/animate';
 	import { quintInOut } from 'svelte/easing';
 
-	type ImageType = components['schemas']['ImageType'];
-
-	let selectedTags: Tag[] = [];
-	let galleryItems: ImageURL[];
 	let editImageDialog: Dialog;
-	let editImage: Image;
-	let imageType: ImageType;
+	let editImage: ImageURL;
 
-	const getTags = async (q: string) => {
-		return await client.GET('/tag/', { params: { query: { tag: q } } }).then((res) => {
-			if (!res.data) {
-				console.error('No Data');
-				return [];
-			}
-			if (res.error) {
-				console.error('Bad Error:');
-				return [];
-			}
-			return res.data.items;
+	let searchInput: HTMLInputElement;
+
+	const handleClick = (image: ImageURL) => {
+		editImage = image;
+		console.log(editImage);
+		tick().then(() => {
+			editImageDialog.open();
 		});
-	};
-
-	$: {
-		if (browser) {
-			imageType;
-			loadImages();
-		}
-	}
-
-	const loadImages = () => {
-		if (selectedTags.length > 0) {
-			client
-				.GET('/image/tag', {
-					params: { query: { taglist: selectedTags.map((t) => t.tag_id), type: imageType } }
-				})
-				.then((response) => {
-					if (!response.data) return;
-					galleryItems = response.data.items;
-				});
-		} else {
-			client
-				.GET('/image/', {
-					params: { query: { type: imageType } }
-				})
-				.then((response) => {
-					if (!response.data) return;
-					galleryItems = response.data.items;
-				});
-		}
-	};
-
-	const extractName = (tag: Tag) => tag.tag;
-	const extractId = (tag: Tag) => tag.tag_id;
-	const selectedTag = (e: CustomEvent<Tag>) => {
-		let tag: Tag = e.detail;
-		if (selectedTags.find((t) => t.tag_id == tag.tag_id)) return;
-		selectedTags = [...selectedTags, tag];
-		loadImages();
-	};
-	const removeTag = (tag: Tag) => {
-		selectedTags = selectedTags.filter((t) => t.tag_id !== tag.tag_id);
-		loadImages();
 	};
 </script>
 
 <div class="container">
+	<ImageGallery>
+		<div
+			slot="gallery"
+			let:galleryItems
+			let:selectedTags
+			class="grid gap-8 p-6 auto-rows-[200px_auto_auto] grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))]"
+		>
+			{#if galleryItems}
+				{#each galleryItems as image (image.image_id)}
+					<button
+						class="grid-rows-subgrid row-span-3 dark:bg-slate-900 rounded-md gap-4 overflow-hidden hover:scale-110 hover:transition-all transition-all"
+						animate:flip={{ duration: 500, easing: quintInOut }}
+						on:click={() => handleClick(image)}
+					>
+						<img
+							class="portrait"
+							src={`/api/${image.thumbnail_url}?width=240`}
+							alt={image.name}
+							width={image.dimension_x}
+							height={image.dimension_y}
+						/>
+
+						<h3 class="heading">{image.name}</h3>
+						<div class="information">
+							<div class="tags flex flex-wrap">
+								{#each image.tags as tag (tag.tag_id)}
+									<ImageTag
+										{tag}
+										interactive={false}
+										highlight={!!selectedTags.find((t) => t.tag_id == tag.tag_id)}
+										small={true}
+									/>
+								{/each}
+							</div>
+							<div class="imid">
+								{capitalise(image.type || 'undefined')}: {image.dimension_x}x{image.dimension_y} - {image.image_id}
+							</div>
+							<div class="palette">
+								{#if image.palette}
+									{#each image.palette.split(',') as colour}
+										<span class="circle" style={`background-color: ${colour};`} />
+									{/each}
+								{/if}
+							</div>
+						</div>
+					</button>
+				{/each}
+			{/if}
+		</div>
+		<!-- <div slot="image" let:image let:tags class="grid grid-cols-subgrid col-span-3">
+			
+		</div> -->
+	</ImageGallery>
+</div>
+<!-- <div class="container">
 	<h1>Gallery</h1>
-	<div class="filter">
-		<Autocomplete
-			getData={getTags}
-			{extractName}
-			{extractId}
-			allowCreation={false}
-			on:submititem={selectedTag}
-		/>
-		<select bind:value={imageType}
-			>Image Type
-			<option value="backdrop">Backdrop</option>
-			<option value="character">Character</option>
-			<option value="map">Map</option>
-			<option value="handout">Handout</option>
-		</select>
-		<div class="tags">
+	<div class="">
+		<div class="flex">
+			<Autocomplete
+				getData={getTags}
+				{extractName}
+				{extractId}
+				allowCreation={false}
+				on:submititem={selectedTag}
+			/>
+			<ImageTypeSelectBox
+				class="h-auto"
+				selected="backdrop"
+				onSelectedChange={(e) => {
+					console.log(e);
+					if (!e) return;
+					// @ts-ignore
+					imageType = e.value;
+				}}
+			/>
+		</div>
+
+		<div class="flex flex-wrap h-10">
 			{#each selectedTags as tag (tag.tag_id)}
 				<ImageTag {tag} on:clickclose={() => removeTag(tag)} />
 			{/each}
 		</div>
 	</div>
-	<div class="gallery">
+	<div class="gallery gap-8 p-6">
 		{#if galleryItems}
 			{#each galleryItems as image (image.image_id)}
-				<div class="gallery-item" animate:flip={{ duration: 500, easing: quintInOut }}>
-					<img
-						class="portrait"
-						src={`/api/${image.thumbnail_url}?width=240`}
-						alt={image.name}
-						width={image.dimension_x}
-						height={image.dimension_y}
-						on:click={() => {
-							editImage = image;
-							console.log(editImage);
-							tick().then(() => {
-								editImageDialog.open();
-							});
-						}}
-					/>
-
-					<h3 class="heading">{image.name}</h3>
-					<div class="information">
-						<div class="tags">
-							{#each image.tags as tag (tag.tag_id)}
-								<ImageTag
-									{tag}
-									interactive={false}
-									highlight={!!selectedTags.find((t) => t.tag_id == tag.tag_id)}
-									small={true}
-								/>
-							{/each}
-						</div>
-						<div class="imid">
-							{capitalise(image.type || 'undefined')}: {image.dimension_x}x{image.dimension_y} - {image.image_id}
-						</div>
-						<div class="palette">
-							{#if image.palette}
-								{#each image.palette.split(',') as colour}
-									<span class="circle" style={`background-color: ${colour};`} />
-								{/each}
-							{/if}
-						</div>
-					</div>
+				<div
+					class="gallery-item dark:bg-slate-900 rounded-md gap-4 overflow-hidden"
+					animate:flip={{ duration: 500, easing: quintInOut }}
+				>
+					
 				</div>
 			{/each}
 		{/if}
 	</div>
-</div>
+</div> -->
 <Dialog mode="mega" bind:this={editImageDialog} on:closed>
 	<section slot="header">
 		<h2>Edit Image</h2>
 	</section>
 	<svelte:fragment slot="content">
 		{#if editImage}
-			<ImageManager image={editImage} />
+			<ImageManager image={editImage} bind:searchInput />
 		{/if}
 	</svelte:fragment>
 </Dialog>
@@ -171,9 +142,9 @@
 	.gallery {
 		display: grid;
 		/* grid-auto-flow: dense; */
-		gap: var(--size-5);
+		/* gap: var(--size-5); */
 		grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
-		padding: var(--size-3);
+		/* padding: var(--size-3); */
 		container-type: inline-size;
 		grid-auto-rows: 200px auto auto;
 		/* flex-direction: row;
@@ -182,13 +153,13 @@
 		gap: var(--size-5); */
 	}
 	.gallery-item {
-		background-color: var(--surface-4);
-		border-radius: var(--radius-3);
+		/* background-color: var(--surface-4);
+		border-radius: var(--radius-3); */
 		grid-row: span 3;
 		grid-template-rows: subgrid;
-		display: grid;
+		/* display: grid;
 		gap: var(--size-3);
-		overflow: hidden;
+		overflow: hidden; */
 		transition: all 0.2s ease-in-out;
 	}
 	.gallery-item:hover {
@@ -199,7 +170,7 @@
 		font-size: larger;
 	}
 	.gallery-item > :not(img) {
-		margin-inline: var(--size-2);
+		margin-inline: 0.5rem;
 	}
 	.gallery-item > img {
 		border-bottom-left-radius: 0;
@@ -216,12 +187,12 @@
 
 		right: 0;
 		border-radius: 50%;
-		margin: var(--size-1);
-		height: var(--size-3);
-		width: var(--size-3);
+		margin: 0.5rem;
+		height: 1rem;
+		width: 1rem;
 		transform: scale(1);
 		/* background: rgba(255, 177, 66, 1); */
-		border: solid 1px var(--text-2);
+		border: solid 1px rgb(230, 230, 230);
 		box-shadow: var(--shadow-2);
 	}
 </style>

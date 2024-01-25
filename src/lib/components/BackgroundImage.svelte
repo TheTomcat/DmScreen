@@ -4,16 +4,21 @@
 	import client from '$lib/api/index';
 	import type { ImageURL } from '../../app';
 	import { browser } from '$app/environment';
+	import { playerStateStore, type wsImageData, type playerState } from '$lib/ws';
 
 	const dispatch = createEventDispatcher<{
 		changing: { prev_image_id: number | undefined; next_image_id: number };
 		changed: { image_id: number };
 	}>();
 
-	export let image_id: number | undefined = undefined;
-	export let cycleImage: boolean = false;
-	export let cycleImageTimeout: number = 30000;
+	// export let image_id: number | undefined = undefined;
+	// export let imageData: wsImageData | undefined = undefined;
+	// export let cycleImage: boolean = false;
+	// export let cycleImageTimeout: number = 30000;
+
+	// export let current_image_id: number | undefined = -1;
 	let previous_image_id: number | undefined = -1;
+	let previous_image_data: wsImageData | undefined = undefined;
 	let imageData: ImageURL | undefined;
 
 	let imageBox: HTMLDivElement;
@@ -21,44 +26,67 @@
 
 	let timeoutID: number | undefined;
 
-	$: {
-		if (browser) {
-			if (image_id != previous_image_id) {
-				fetchImageDataAndDisplayImage(image_id);
-			}
-		}
-	}
-
 	onDestroy(() => {
 		clearTimeout(timeoutID);
 	});
 
 	$: {
-		if (!cycleImage) {
-			console.log('clearing');
-			clearTimeout(timeoutID);
-			timeoutID = undefined;
-		} else if (cycleImage && !timeoutID) {
-			console.log('scheduling');
-			schedulePageUpdate(cycleImageTimeout);
+		$playerStateStore.background_image_data; //If the data changes
+		if (browser) {
+			if ($playerStateStore.background_image_data != previous_image_data) {
+				// And the data is not the same as the old data
+				// Find out what image we should display
+
+				fetchImageDataAndDisplayImage(); // Get an image
+			}
 		}
 	}
 
-	const schedulePageUpdate = (timer = cycleImageTimeout) => {
+	$: {
+		if (!$playerStateStore.background_image_cycle) {
+			console.log('clearing');
+			clearTimeout(timeoutID);
+			timeoutID = undefined;
+		} else if ($playerStateStore.background_image_cycle && !timeoutID) {
+			console.log('scheduling');
+			schedulePageUpdate($playerStateStore.background_image_timeout);
+		}
+	}
+
+	const schedulePageUpdate = (timer = -1) => {
+		if (timer == -1) timer = $playerStateStore.background_image_timeout;
 		timeoutID = setTimeout(() => {
 			fetchImageDataAndDisplayImage();
 			schedulePageUpdate(timer);
 		}, timer);
 	};
-	// if (cycleImage) {
-	// 	console.log('Scheduling update');
-	// 	onMount(() => {
-	// 		schedulePageUpdate();
-	// 	});
-	// }
 
-	const fetchImageDataAndDisplayImage = (image_id: number | undefined = undefined) => {
-		getImageData(image_id).then((response) => {
+	const _chooseNextImage = (): number | undefined => {
+		let d = $playerStateStore.background_image_data;
+		if (!d) {
+			return undefined;
+		} else if (typeof d == 'number') {
+			return d;
+		} else if (Array.isArray(d) && typeof d[0] == 'number') {
+			return d[Math.floor(Math.random() * d.length)];
+		} else if ('collection_id' in d) {
+			return d.images[Math.floor(Math.random() * d.images.length)].image_id;
+		} else if ('image_id' in d) {
+			return d.image_id;
+		}
+		return undefined; // random
+	};
+
+	const chooseNextImage = () => {
+		playerStateStore.update((state) => {
+			return { ...state, background_image_id: _chooseNextImage() };
+		});
+	};
+
+	const fetchImageDataAndDisplayImage = () => {
+		chooseNextImage();
+		if (previous_image_id == $playerStateStore.background_image_id) return;
+		getImageData($playerStateStore.background_image_id).then((response) => {
 			console.log(
 				`Fetching image data: <Image ${response.data?.image_id}>: ${
 					response.data ? 'got!' : `fail: ${response.error}`
@@ -70,7 +98,8 @@
 					prev_image_id: previous_image_id,
 					next_image_id: response.data.image_id
 				});
-				previous_image_id = image_id;
+				previous_image_id = $playerStateStore.background_image_id;
+				previous_image_data = $playerStateStore.background_image_data;
 				preloadImage(imageData.url, (e: Event) => {
 					is_transitioning = true;
 					setTimeout(() => {

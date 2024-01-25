@@ -5,6 +5,8 @@
 
 	import Autocomplete from '$lib/components/Autocomplete.svelte';
 	import ImageTag from '$lib/components/ImageTag.svelte';
+	import Input from '../ui/input/input.svelte';
+	import ImageTypeSelectBox from '../ImageTypeSelectBox.svelte';
 
 	type Image = components['schemas']['ImageURL'];
 	type Tag = components['schemas']['Tag'];
@@ -123,8 +125,8 @@
 				/>
 			{/if}
 		</div>
-		<input
-			class="name"
+		<Input
+			class="name w-full"
 			placeholder="Image Name"
 			data-form-type="other"
 			bind:value={image.name}
@@ -132,11 +134,20 @@
 				setName(e.currentTarget.value);
 			}}
 		/>
-		<select class="type" value={image.type} on:change={handleChange}>
+		<ImageTypeSelectBox
+			selected={image.type}
+			onSelectedChange={(e) => {
+				console.log(e);
+				if (!e) return;
+				// @ts-ignore
+				setType(e.value);
+			}}
+		/>
+		<!-- <select class="type" value={image.type} on:change={handleChange}>
 			{#each imageTypes as type}
 				<option value={type}>{capitalise(type)}</option>
 			{/each}
-		</select>
+		</select> -->
 		<div class="tagfield">
 			<Autocomplete
 				bind:searchInput
@@ -150,7 +161,7 @@
 				allowCreation={true}
 			/>
 		</div>
-		<div class="tags">
+		<div class="tags flex justify-start flex-wrap py-2">
 			{#each image.tags as tag (tag.tag_id)}
 				<ImageTag {tag} on:clickclose={() => removeTag(tag)} />
 			{/each}

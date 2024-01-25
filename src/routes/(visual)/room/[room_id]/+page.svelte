@@ -2,7 +2,6 @@
 	import BackgroundEffect from '$lib/components/BackgroundEffect.svelte';
 	import BackgroundImage from '$lib/components/BackgroundImage.svelte';
 	import BackgroundMessage2 from '$lib/components/BackgroundMessage2.svelte';
-	import CombatManager from '$lib/components/CombatManager.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import { playerStateStore, combat, initialise, activeParticipant, wsReciever } from '$lib/ws';
 	import { onDestroy, onMount } from 'svelte';
@@ -55,9 +54,9 @@
 		<BackgroundEffect n={50} />
 	{:else if $playerStateStore.background_image_display}
 		<BackgroundImage
-			bind:image_id={$playerStateStore.background_image_id}
-			cycleImageTimeout={$playerStateStore.background_image_timeout}
-			bind:cycleImage={$playerStateStore.background_image_cycle}
+			on:changed={(e) => {
+				ws.notifyBackgroundImage({ image_id: e.detail.image_id });
+			}}
 		/>
 	{/if}
 	{#if $playerStateStore.spinner_display}
@@ -97,7 +96,11 @@
 			</div>
 			<div class="portrait">
 				{#if activeParticipantImage}
-					<img src={`/api/${activeParticipantImage.url}`} />
+					<img
+						src={`/api/${activeParticipantImage.url}`}
+						alt={activeParticipantImage.name}
+						class="shadow-lg"
+					/>
 				{:else}
 					<Spinner centerScreen={false} />
 				{/if}
@@ -124,7 +127,7 @@
 	<!-- {:else if $playerStateStore.mode == 'handout'}{:else if $playerStateStore.mode == 'map'} -->
 	{#if $playerStateStore.announce_display}
 		<div class="messagecontainer">
-			<div class="messagebox" transition:scale>
+			<div class="messagebox bg-gray-600" transition:scale>
 				<h1>{$playerStateStore.announce_text}</h1>
 				<!-- <SquiggleText text={$playerStateStore.announce_text} /> -->
 			</div>
@@ -132,7 +135,7 @@
 	{/if}
 	{#if $playerStateStore.handout_display}
 		<div class="handoutcontainer">
-			<div class="messagebox handoutbox" transition:scale>
+			<div class="messagebox handoutbox h-full" transition:scale>
 				<Handout />
 			</div>
 		</div>
@@ -161,12 +164,12 @@
 		left: 50%; */
 		/* transform: translate3d(-50%, -50%, 0); */
 		font-size: xx-large;
-		background: var(--surface-4);
+		/* background: ; */
 		width: 80%;
 		height: 250px;
 
 		text-align: center;
-		border-radius: var(--size-3);
+		border-radius: 1rem;
 		box-shadow: var(--shadow-3);
 		display: flex;
 		flex-direction: column;
@@ -208,9 +211,9 @@
 		width: 100%;
 		height: 100%;
 		display: grid;
-		column-gap: var(--size-7);
-		row-gap: var(--size-7);
-		padding: var(--size-7);
+		column-gap: 2rem;
+		row-gap: 2rem;
+		padding: 2rem;
 		grid-template-columns: 1fr 2fr;
 		grid-template-rows: 1fr minmax(0, 6fr) 0.5fr;
 		height: 100%;
@@ -219,19 +222,20 @@
 		/* background-color: red; */
 	}
 	.condition {
-		padding-inline: var(--size-3);
-		padding-block: var(--size-1);
+		padding-inline: 1rem;
+		padding-block: 0.25rem;
 		margin: var(--size-2);
 		background-color: #333;
-		border-radius: var(--radius-3);
+		border-radius: 1rem;
 	}
 	.overlay {
 		background-color: rgba(216, 216, 216, 0.2);
+		border-radius: 1rem;
 		/* opacity: 0.8; */
 		align-self: stretch;
 		justify-self: stretch;
-		border-radius: var(--radius-3);
-		padding: var(--size-3);
+		/* border-radius: var(--radius-3); */
+		padding: 1rem;
 	}
 	.combatants {
 		grid-area: 1 / 1 / 4 / 2;
@@ -239,7 +243,7 @@
 	}
 	.portrait {
 		grid-area: 2 / 2 / 3 / 3;
-
+		border-radius: 1rem;
 		/* background-color: transparent; */
 		/* opacity: 1; */
 	}
@@ -270,7 +274,10 @@
 		overflow: hidden;
 		height: 100%;
 		border: 1px solid var(--gray-6);
-		box-shadow: var(--shadow-5);
+		box-shadow: rgba(3, 4, 7, 0.12) 0px -1px 2px 0px, rgba(3, 4, 7, 0.13) 0px 2px 1px -2px,
+			rgba(3, 4, 7, 0.13) 0px 5px 5px -2px, rgba(3, 4, 7, 0.14) 0px 10px 10px -2px,
+			rgba(3, 4, 7, 0.15) 0px 20px 20px -2px, rgba(3, 4, 7, 0.17) 0px 40px 40px -2px;
+		border-radius: 1rem;
 
 		/* opacity: 1; */
 	}

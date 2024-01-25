@@ -2,7 +2,7 @@
 	import { apiGetCombat } from '$lib/api';
 	import { onMount } from 'svelte';
 	import type { Combat, Participant } from '../app';
-	import ParticipantRow from './ParticipantRow.svelte';
+	import ParticipantRow from '../ParticipantRow.svelte';
 	import { FolderPlus, Heart, Pause, ShieldHalf } from 'lucide-svelte';
 
 	import {
@@ -12,7 +12,7 @@
 		sort_participants_naive,
 		reorderParticipants,
 		type ParticipantID
-	} from '../stores/combatStore';
+	} from '../../stores/combatStore';
 
 	// import { dndzone, SOURCES, TRIGGERS, type DndEvent, setDebugMode } from 'svelte-dnd-action';
 	import { flip } from 'svelte/animate';

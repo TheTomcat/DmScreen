@@ -5,7 +5,7 @@
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { Megaphone } from 'lucide-svelte';
-	import CombatManager from '$lib/components/CombatManager.svelte';
+	import CombatManager from '$lib/components/old/CombatManager.svelte';
 
 	let playerScreenMode: string;
 	let ws: WebSocket;

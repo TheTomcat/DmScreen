@@ -30,6 +30,7 @@
 	import type { Participant, Entity, Combat } from '../../app';
 	import client from '$lib/api/index';
 	import { combat } from '$lib/ws';
+	import * as Popover from '$lib/components/ui/popover';
 
 	import { createEventDispatcher, onDestroy, tick } from 'svelte';
 	import type { wsController } from '$lib/ws';
@@ -53,6 +54,7 @@
 	let damaging: boolean = true;
 	let damageAmount: number = 0;
 	let damageInputField: HTMLInputElement;
+	let popoverOpen = false;
 
 	let conditionsDialog: Dialog;
 	let conditions_parcipitant: Participant | undefined;
@@ -144,8 +146,9 @@
 		damageAmount = 0;
 		damaging_participant = participant;
 		// showModal = true;
-		damageDialog.open();
-		tick().then(() => damageInputField.focus());
+		popoverOpen = true;
+		// damageDialog.open();
+		// tick().then(() => damageInputField.focus());
 	};
 	const applyDamage = () => {
 		if (damageAmount != 0) {
@@ -423,6 +426,28 @@
 <Dialog mode="mega" showMenu={false} bind:this={statblockDialog}>
 	<Statblock slot="content" entity={statblockEntity} participant={statblockParticipant} />
 </Dialog>
+
+<Popover.Root bind:open={popoverOpen}>
+	<Popover.Trigger>t</Popover.Trigger>
+	<Popover.Content>
+		<div>
+			{#if damaging_participant && damaging_participant.participant_id}
+				<h5>Apply {`${damaging ? 'damage' : 'healing'}`} to {damaging_participant.name}</h5>
+				<input
+					placeholder={`Apply ${damaging ? 'damage' : 'healing'}`}
+					bind:value={damageAmount}
+					bind:this={damageInputField}
+					on:keydown={onDamageKeyDown}
+				/>
+				{#if damaging}
+					<button on:click={applyDamage}><SwordsIcon color={'red'} />Apply Damage</button>
+				{:else}
+					<button on:click={applyDamage}><CrossIcon color={'green'} />Apply Healing</button>
+				{/if}
+			{/if}
+		</div>
+	</Popover.Content>
+</Popover.Root>
 
 <Dialog mode="mega" showMenu={false} bind:this={damageDialog}>
 	<div slot="content">

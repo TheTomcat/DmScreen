@@ -13,8 +13,8 @@
 	import InputBox from '$lib/components/InputBox.svelte';
 	import type { Combat, Entity, Participant, RollMode } from '../../../../app';
 	import { apiAddParticipantToCombat, apiGetAllEntities } from '$lib/api';
-	import CombatTable from '$lib/components/CombatTable.svelte';
-	import InitiativeBox from '$lib/components/InitiativeBox.svelte';
+	import CombatTable from '$lib/components/old/CombatTable.svelte';
+	import InitiativeBox from '$lib/components/old/InitiativeBox.svelte';
 
 	import { page } from '$app/stores';
 	import { Crown, PlusSquare, Rat } from 'lucide-svelte';

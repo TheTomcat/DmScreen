@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { SvelteToast } from '@zerodevx/svelte-toast';
 
-	import 'open-props/style';
-	import 'open-props/normalize';
-	import 'open-props/buttons';
+	// import 'open-props/style';
+	// import 'open-props/normalize';
+	// import 'open-props/buttons';
 	//import '@picocss/pico';
-	import '../../app.css';
+	import '../../app.pcss';
 
 	let options = {
 		//https://github.com/zerodevx/svelte-toast
 	};
 </script>
 
-<main>
+<main class="bg-background">
 	<slot />
 </main>
 <SvelteToast {options} />

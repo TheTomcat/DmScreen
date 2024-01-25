@@ -5,7 +5,7 @@
 	import InputBox from '$lib/components/InputBox.svelte';
 	import type { Entity, Participant, Combat } from '../../../app';
 
-	import { Edit, Info, Minus, Plus, PlusSquare, X } from 'lucide-svelte';
+	import { Edit, Image, ImageOff, Info, Minus, Plus, PlusSquare, X } from 'lucide-svelte';
 
 	import { debounce, roll } from '$lib';
 	import { flip } from 'svelte/animate';
@@ -14,7 +14,7 @@
 	import client from '$lib/api/index';
 	import { toast } from '@zerodevx/svelte-toast';
 	import Dialog from '$lib/components/Dialog.svelte';
-	import EntityEdit from '$lib/components/EntityEdit.svelte';
+	import EntityEdit from '$lib/components/old/EntityEdit.svelte';
 	import { browser } from '$app/environment';
 
 	// import { loading } from '../../../../lib/stores/combatStore';
@@ -45,6 +45,7 @@
 		entity_id: number;
 		cr: undefined;
 	};
+	type AnyEntity = Entity | QuickEntity;
 	let quickEntityId = -1;
 	let quickEntity: QuickEntity = {
 		name: '',
@@ -55,7 +56,7 @@
 		cr: undefined
 	};
 
-	let combatants: { entity: Entity | QuickEntity; count: number }[] = [];
+	let combatants: { entity: AnyEntity; count: number }[] = [];
 
 	let flipDurationMs: number = 200;
 
@@ -144,7 +145,7 @@
 		};
 	};
 
-	let removeCombatant = (entity: Entity) => {
+	let removeCombatant = (entity: AnyEntity) => {
 		let index = combatants?.findIndex(
 			(combatant) => combatant.entity.entity_id == entity.entity_id
 		);
@@ -153,7 +154,7 @@
 		}
 	};
 
-	let changeCount = (entity: Entity, addor: number) => {
+	let changeCount = (entity: AnyEntity, addor: number) => {
 		// console.log(entity);
 		let index = combatants?.findIndex(
 			(combatant) => combatant.entity.entity_id == entity.entity_id
@@ -310,6 +311,7 @@
 					<th>Combatant</th>
 					<th>CR</th>
 					<th>Count</th>
+					<th>Image</th>
 					<th />
 				</thead>
 				<tbody>
@@ -331,6 +333,13 @@
 								<button on:click={(e) => changeCount(combatant.entity, 1)}>
 									<Plus />
 								</button>
+							</td>
+							<td>
+								{#if combatant.entity && 'image_id' in combatant.entity && combatant.entity.image_id}
+									<Image />
+								{:else}
+									<ImageOff />
+								{/if}
 							</td>
 							<td>
 								<div class="aligncenter">

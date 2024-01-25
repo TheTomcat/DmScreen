@@ -8,11 +8,13 @@
 		ArrowLeft,
 		ArrowRight,
 		ChevronRightSquare,
+		Clipboard,
 		ClipboardCopy,
 		Cross,
 		Dices,
 		DicesIcon,
 		Droplets,
+		FileSearch,
 		Hourglass,
 		Image,
 		Megaphone,
@@ -28,36 +30,35 @@
 		UploadCloud,
 		X
 	} from 'lucide-svelte';
-	import {
-		initialise,
-		type wsPlayerMode,
-		type playerState,
-		playerStateStore,
-		combat,
-		wsController
-	} from '$lib/ws';
+	import { initialise, playerStateStore, combat, wsController } from '$lib/ws';
 	import client from '$lib/api/index';
 	import type { Combat, Participant } from '../../../../app';
-	import {
-		get_next_alive_participant_id,
-		get_next_participant_id,
-		get_top_initiative_id,
-		sort_participants_by_id,
-		sort_participants_naive
-	} from '$lib';
+	import { get_next_alive_participant_id, get_top_initiative_id, makeCancelable } from '$lib';
 	import Dialog from '$lib/components/Dialog.svelte';
-	import InitiativeRoller from '$lib/components/InitiativeRoller.svelte';
+
 	import CombatInitiativeOrder from '$lib/components/CombatInitiativeOrder.svelte';
 	import CombatSetup from '$lib/components/new/CombatSetup.svelte';
-	import HitPointRow from '$lib/components/new/HitPointRow.svelte';
 	import HitPointTable from '$lib/components/new/HitPointTable.svelte';
+	import * as Sheet from '$lib/components/ui/sheet';
 
 	import Pagination from '$lib/components/Pagination.svelte';
-	import PaginationStub from '$lib/components/PaginationStub.svelte';
 	import {
 		dispatchGeneralCounterEvent,
 		dispatchParticipantCounterEvent
 	} from '$lib/stores/counterStore';
+	import Input from '$lib/components/ui/input/input.svelte';
+	import { Label } from '$lib/components/ui/label';
+	import { Button } from '$lib/components/ui/button';
+	import { Toggle } from '$lib/components/ui/toggle';
+
+	import * as ToggleGroup from '$lib/components/ui/toggle-group';
+	import { crossfade } from 'svelte/transition';
+	import { cubicInOut } from 'svelte/easing';
+	import { cn } from '$lib/utils';
+	import { tweened } from 'svelte/motion';
+	import ImageSelection from '$lib/components/ImageSelection.svelte';
+
+	let announceTimer = tweened(100);
 
 	let ws: wsController;
 	let debugmode: boolean = true;
@@ -75,6 +76,9 @@
 	let urlBox: Dialog;
 	let urlBoxInputField: HTMLInputElement;
 
+	let selectionOpen: boolean = false;
+	let imageSelectionMode: 'backdrop' | 'handout' = 'backdrop';
+
 	onMount(() => {
 		ws = new wsController(`/live/socket/${session_id}`);
 		// console.log($page.url.origin);
@@ -84,6 +88,11 @@
 
 	onDestroy(() => {
 		if (ws) ws.close();
+	});
+
+	const [send, receive] = crossfade({
+		duration: 250,
+		easing: cubicInOut
 	});
 
 	const getCombats = async (page: number = 1) => {
@@ -97,17 +106,53 @@
 
 	let announce = () => {
 		if (autoClearAnnoucement) {
-			ws.announce({ message: announcement, timeout: 10000, display: true });
+			ws.announce({
+				message: announcement,
+				timeout: $playerStateStore.announce_timeout,
+				display: true
+			});
 		} else {
-			ws.announce({ message: announcement, timeout: -1, display: true });
+			ws.announce({
+				message: announcement,
+				timeout: $playerStateStore.announce_timeout,
+				display: true
+			});
+		}
+		if (autoClearAnnoucement) {
+			setTimeout(clearAnnouncement, $playerStateStore.announce_timeout);
+		}
+	};
+	let handleAnnounce = () => {
+		if (!isAnnouncing) {
+			isAnnouncing = true;
+			announce();
+			if (autoClearAnnoucement) {
+				awaitingCancel = true;
+				announceTimer.set(100, { duration: 0 });
+				announcePromise = makeCancelable<void>(
+					announceTimer.set(0, { duration: $playerStateStore.announce_timeout })
+				);
+				announcePromise.promise.then(() => {
+					clearAnnouncement();
+					isAnnouncing = false;
+					awaitingCancel = false;
+				});
+			}
+		} else {
+			if (announcePromise) announcePromise.cancel();
+			clearAnnouncement();
+			isAnnouncing = false;
+			awaitingCancel = false;
 		}
 	};
 	let clearAnnouncement = () => {
 		ws.clearAnnouncement();
 	};
-
+	let announcePromise: ReturnType<typeof makeCancelable<void>>;
 	let announcement: string;
 	let autoClearAnnoucement: boolean = false;
+	let isAnnouncing = false;
+	let awaitingCancel = false;
 
 	// const setHitPoints = (e: CustomEvent) => {
 	// 	// if (!$combat) return;
@@ -182,75 +227,165 @@
 		$combat.participants.forEach((p) => ws.setDamage(p.participant_id, 0));
 		// ws.updateCombat({ combat: $combat });
 	};
+
+	// const actions = ['Announce', 'Backdrop', 'Message', 'Combat', 'Handout'];
+	// let currentAction = 'Announce';
+
+	// const beforeUnload = (event: BeforeUnloadEvent) => {};
 </script>
+
+<!-- <svelte:window on:beforeunload={beforeUnload} /> -->
 
 {#if $playerStateStore}
 	<div class="sessioncontainer">
 		<div class="sessionheader">
 			<h1>Session Driver</h1>
 			<div>
-				<button
+				<Button
+					variant="outline"
 					on:click={() => {
 						urlBox.open();
 						tick().then(() => {
 							urlBoxInputField.select();
 						});
-					}}>Copy Client URL</button
+					}}><Clipboard class="w-4 h-4 mr-1" />Copy Client URL</Button
 				>
 			</div>
 		</div>
-		<div class="main">
+		<div class="border-solid border-[1px] rounded-md border-gray-600 p-3 my-3">
+			<!-- Scrollbox component, not really needed but also cool so don't delete -->
+			<!-- <div class="relative">
+				<div class="lg:max-w-none">
+					<div class="mb-4 flex items-center overflow-y-auto pb-3 md:pb-0 gap-3">
+						{#each actions as action, index (index)}
+							{@const isActive = currentAction == action}
+							<Button
+								class={cn(
+									'relative flex h-7 items-center justify-center rounded-full px-4 text-center text-sm transition-colors bg-[unset] hover:text-primary',
+									isActive ? 'font-medium text-primary' : 'text-muted-foreground'
+								)}
+								on:click={() => {
+									currentAction = action;
+								}}
+							>
+								{#if isActive}
+									<div
+										class="absolute inset-0 rounded-full bg-muted"
+										in:send={{ key: 'activetab' }}
+										out:receive={{ key: 'activetab' }}
+									/>
+								{/if}
+								<div class="relative">
+									{action}
+								</div>
+							</Button>
+						{/each}
+					</div>
+				</div>
+			</div> -->
+			<!-- End Scrollbox Component -->
+
 			<!-- <div style="display: flex; justify-content: space-between;">
 				<h3>Session Controls</h3>
 			</div> -->
-			<div style="display: grid; grid-template-columns: auto 1fr;">
-				<div class="verticalcenter">Announce:</div>
-				<div>
-					<input bind:value={announcement} placeholder="Announce Message" />
-					<button on:click={announce}>Announce<Megaphone /></button>
-					<label for="autoclearannounce">Automatically Clear</label><input
-						id="autoclearannounce"
-						type="checkbox"
-						bind:checked={autoClearAnnoucement}
+			<div class="grid gap-2" style="grid-template-columns: auto 1fr;">
+				<div class="flex flex-col justify-center">Announce:</div>
+				<div class="flex gap-3 justify-start">
+					<Input bind:value={announcement} placeholder="Announce Message" class="w-[200px]" />
+
+					<Button on:click={handleAnnounce} variant="outline" class="w-32">
+						{#if isAnnouncing}
+							<div class="flex flex-col w-full">
+								<div class="flex flex-row justify-center">
+									<MegaphoneOff class="w-4 h-4 mr-2" />
+									Clear
+								</div>
+								{#if awaitingCancel}
+									<div class="w-full bg-gray-200 rounded-full h-0.5 dark:bg-gray-700">
+										<div class="bg-blue-600 h-0.5 rounded-full" style="width: {$announceTimer}%" />
+									</div>
+								{/if}
+							</div>
+						{:else}
+							<Megaphone class="w-4 h-4 mr-2" />Announce
+						{/if}
+					</Button>
+					<!-- <Button on:click={announce} variant="outline" class="w-40">
+						<Megaphone class="w-4 h-4 mr-2" />Announce
+					</Button>
+					<Button on:click={clearAnnouncement} variant="outline" disabled={autoClearAnnoucement}>
+						<MegaphoneOff class="w-4 h-4 mr-2" />
+						Clear Announcement
+					</Button> -->
+					<Toggle bind:pressed={autoClearAnnoucement} variant="outline">
+						<label for="autoclearannounce">Automatically Clear</label>
+					</Toggle>
+					<Input
+						bind:value={$playerStateStore.announce_timeout}
+						placeholder="Announce Timeout"
+						class="w-[200px]"
 					/>
-					<button on:click={clearAnnouncement} disabled={autoClearAnnoucement}
-						>Clear Announcement<MegaphoneOff /></button
-					>
 				</div>
-				<div class="verticalcenter">Backdrop:</div>
-				<div>
-					<button
-						class:checked={$playerStateStore.background_image_display}
-						on:click={(e) => {
+				<div class="flex flex-col justify-center">Backdrop:</div>
+				<div class="flex gap-3 justify-start">
+					<Toggle
+						variant="outline"
+						bind:pressed={$playerStateStore.background_image_display}
+						onPressedChange={(e) => {
+							console.log('change');
 							ws.setBackgroundImage({
 								cycle: $playerStateStore.background_image_cycle,
+								data: $playerStateStore.background_image_data,
 								display: !$playerStateStore.background_image_display,
 								timeout: $playerStateStore.background_image_timeout,
 								image_id: $playerStateStore.background_image_id
 							});
-						}}>Show Background <Image /></button
+						}}
 					>
-					<button
-						class:checked={$playerStateStore.background_image_cycle}
+						<Image class="w-4 h-4 mr-2" />
+						Show Background
+					</Toggle>
+					<Toggle
+						variant="outline"
+						bind:pressed={$playerStateStore.background_image_cycle}
 						on:click={(e) => {
 							ws.setBackgroundImage({
 								cycle: !$playerStateStore.background_image_cycle,
+								data: $playerStateStore.background_image_data,
 								display: $playerStateStore.background_image_display,
 								timeout: $playerStateStore.background_image_timeout,
 								image_id: $playerStateStore.background_image_id
 							});
 						}}
 					>
-						Cycle Background <RefreshCw />
-					</button>
-					<input placeholder="Timeout" bind:value={$playerStateStore.background_image_timeout} />
-					<input
+						<RefreshCw class="w-4 h-4 mr-2" />
+						Cycle Background
+					</Toggle>
+
+					<Input
+						placeholder="Timeout"
+						bind:value={$playerStateStore.background_image_timeout}
+						class="w-[200px]"
+					/>
+					<Button
+						variant="secondary"
+						on:click={() => {
+							imageSelectionMode = 'backdrop';
+							selectionOpen = true;
+						}}
+					>
+						<FileSearch class="w-4 h-4 mr-1" />Select Image...
+					</Button>
+					<Input
 						placeholder="Image ID"
 						bind:value={$playerStateStore.background_image_id}
-						on:blur={() => {
+						class="w-[200px]"
+						disabled={true}
+						on:change={() => {
 							if ($playerStateStore.background_image_id) {
 								ws.setBackgroundImage({
 									cycle: false,
+									data: $playerStateStore.background_image_data,
 									display: $playerStateStore.background_image_display,
 									timeout: $playerStateStore.background_image_timeout,
 									image_id: $playerStateStore.background_image_id
@@ -258,6 +393,7 @@
 							} else {
 								ws.setBackgroundImage({
 									cycle: $playerStateStore.background_image_cycle,
+									data: $playerStateStore.background_image_data,
 									display: $playerStateStore.background_image_display,
 									timeout: $playerStateStore.background_image_timeout,
 									image_id: $playerStateStore.background_image_id
@@ -266,22 +402,27 @@
 						}}
 					/>
 				</div>
-				<div class="verticalcenter">Message:</div>
-				<div>
-					<button
-						class:checked={$playerStateStore.message_display}
-						on:click={(e) => {
+				<div class="flex flex-col justify-center">Message:</div>
+				<div class="flex gap-3 justify-start">
+					<Toggle
+						variant="outline"
+						bind:pressed={$playerStateStore.message_display}
+						onPressedChange={(e) => {
 							ws.setLoadingMessage({
 								cycle: $playerStateStore.message_cycle,
 								display: !$playerStateStore.message_display,
 								timeout: $playerStateStore.message_timeout,
 								message_id: $playerStateStore.message_id
 							});
-						}}>Show Message <ScrollText /></button
+						}}
 					>
-					<button
-						class:checked={$playerStateStore.message_cycle}
-						on:click={(e) => {
+						<ScrollText class="w-4 h-4 mr-2" />
+						Show Message
+					</Toggle>
+					<Toggle
+						variant="outline"
+						bind:pressed={$playerStateStore.message_cycle}
+						onPressedChange={(e) => {
 							ws.setLoadingMessage({
 								cycle: !$playerStateStore.message_cycle,
 								display: $playerStateStore.message_display,
@@ -290,43 +431,71 @@
 							});
 						}}
 					>
-						Cycle Message <RefreshCw />
-					</button>
-					<button
-						class:checked={$playerStateStore.spinner_display}
-						on:click={(e) => {
+						<RefreshCw class="w-4 h-4 mr-2" />
+						Cycle Message
+					</Toggle>
+					<Toggle
+						variant="outline"
+						bind:pressed={$playerStateStore.spinner_display}
+						onPressedChange={(e) => {
 							ws.showSpinner({
 								display: !$playerStateStore.spinner_display
 							});
 						}}
 					>
-						Show Loading Spinner <Hourglass />
-					</button>
-					<input placeholder="Timeout" bind:value={$playerStateStore.message_timeout} />
+						<Hourglass
+							class={cn('w-4 h-4 mr-2', $playerStateStore.spinner_display && 'animate-spin')}
+						/>
+						Show Loading Spinner
+					</Toggle>
+					<Input
+						placeholder="Timeout"
+						bind:value={$playerStateStore.message_timeout}
+						class="w-[200px]"
+					/>
 				</div>
-				<div class="verticalcenter">Combat:</div>
-				<div>
-					<button
-						class:checked={$playerStateStore.combat_display}
-						on:click={(e) => {
+				<div class="flex flex-col justify-center">Combat:</div>
+				<div class="flex gap-3 justify-start">
+					<Toggle
+						variant="outline"
+						disabled={!$playerStateStore.combat}
+						bind:pressed={$playerStateStore.combat_display}
+						onPressedChange={(e) => {
 							ws.showCombat({
 								display: !$playerStateStore.combat_display
 							});
-						}}>Show Combat <Swords /></button
+						}}
 					>
+						<Swords class="w-4 h-4 mr-2" />
+						Show Combat
+					</Toggle>
 				</div>
-				<div class="verticalcenter">Handout:</div>
-				<div>
-					<button
-						class:checked={$playerStateStore.handout_display}
-						on:click={(e) => {
+				<div class="flex flex-col justify-center">Handout:</div>
+				<div class="flex gap-3 justify-start">
+					<Toggle
+						variant="outline"
+						bind:pressed={$playerStateStore.handout_display}
+						onPressedChange={(e) => {
 							ws.setHandout({
 								display: !$playerStateStore.handout_display,
 								handout_id: $playerStateStore.handout_image_id
 							});
-						}}>Show Handout <Scroll /></button
+						}}
+						><Scroll class="w-4 h-4 mr-2" />
+						Show Handout
+					</Toggle>
+					<Input
+						placeholder="Handout ID"
+						bind:value={$playerStateStore.handout_image_id}
+						class="w-[200px]"
+					/>
+					<Button
+						variant="secondary"
+						on:click={() => {
+							imageSelectionMode = 'handout';
+							selectionOpen = true;
+						}}><FileSearch class="w-4 h-4 mr-1" />Select Handout...</Button
 					>
-					<input placeholder="Handout ID" bind:value={$playerStateStore.handout_image_id} />
 				</div>
 			</div>
 		</div>
@@ -359,7 +528,7 @@
 		{:else if $playerStateStore && $playerStateStore.combat}
 			{#if $combat}
 				<div class="main">
-					<div style="display: flex; justify-content: space-between;">
+					<div class="flex justify-between">
 						<h3>Run Combat: {$combat.title}</h3>
 						<div>
 							<button
@@ -395,7 +564,7 @@
 						> -->
 					{:else}
 						<!-- <button disabled><PauseOctagon /> Suspend Combat</button> -->
-						<div style="display: flex; justify-content: space-between; align-items: center;">
+						<div class="flex justify-between items-center">
 							<button
 								on:click={() => {
 									if ($combat && $combat.active_participant_id) {
@@ -442,6 +611,32 @@
 	{JSON.stringify($playerStateStore)}
 </div> -->
 
+<Sheet.Root bind:open={selectionOpen}>
+	<Sheet.Content side="right" class="overflow-y-scroll sm:max-w-[100%]">
+		<ImageSelection
+			selectSingleImage={imageSelectionMode == 'handout'}
+			on:selection={(e) => {
+				if (imageSelectionMode == 'backdrop') {
+					ws.setBackgroundImage({
+						cycle: $playerStateStore.background_image_cycle,
+						data: e.detail.imageData,
+						display: $playerStateStore.background_image_display,
+						timeout: $playerStateStore.background_image_timeout,
+						image_id: $playerStateStore.background_image_id
+					});
+				} else {
+					if (e.detail.collection) return;
+					ws.setHandout({
+						display: $playerStateStore.handout_display,
+						handout_id: e.detail.imageData
+					});
+				}
+				selectionOpen = false;
+			}}
+		/>
+	</Sheet.Content>
+</Sheet.Root>
+
 {#if $combat && $combat.participants}
 	<CombatSetup
 		bind:this={initDialog}
@@ -450,6 +645,7 @@
 		on:submitForm={onSubmitForm}
 	/>
 {/if}
+
 <Dialog mode={'mini'} bind:this={urlBox}>
 	<div slot="content" style="display:flex; align-items: center; justify-content: flex-start;">
 		<input class="boxbutton" bind:value={clientURL} readonly={true} bind:this={urlBoxInputField} />
@@ -465,11 +661,6 @@
 </Dialog>
 
 <style>
-	.verticalcenter {
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-	}
 	.checked {
 		background-color: var(--brand-background);
 	}
@@ -514,8 +705,8 @@
 	.main {
 		padding: var(--size-3);
 		margin: var(--size-3);
-		border-radius: var(--radius-3);
-		border: var(--border-size-2) solid var(--gray-8);
+		/* border-radius: var(--radius-3);
+		border: var(--border-size-2) solid var(--gray-8); */
 	}
 	.container {
 		display: grid;

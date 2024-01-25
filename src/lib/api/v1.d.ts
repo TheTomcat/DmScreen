@@ -201,6 +201,12 @@ export interface paths {
     /** Get Image As Base64 */
     get: operations["get_image_as_base64"];
   };
+  "/image/{image_id}/collection": {
+    /** Remove From Collection */
+    delete: operations["remove_from_collection"];
+    /** Add To Collection */
+    patch: operations["add_to_collection"];
+  };
   "/tag/": {
     /**
      * List Tags
@@ -232,6 +238,33 @@ export interface paths {
     /** Merge Tags */
     put: operations["merge_tags"];
   };
+  "/collection/": {
+    /**
+     * List Collections
+     * @description Get all collections
+     */
+    get: operations["list_collections"];
+    /**
+     * Create Collection
+     * @description Create a new collection
+     */
+    post: operations["create_collection"];
+  };
+  "/collection/orphans": {
+    /** Get Empty Collections */
+    get: operations["get_empty_collections"];
+  };
+  "/collection/{collection_id}": {
+    /**
+     * Get Collection
+     * @description Get a single collection by id
+     */
+    get: operations["get_collection"];
+    /** Delete Collection */
+    delete: operations["delete_collection"];
+    /** Update Collection */
+    patch: operations["update_collection"];
+  };
   "/live/": {
     /** Index */
     get: operations["index"];
@@ -249,6 +282,34 @@ export interface components {
        * Format: binary
        */
       image_file: string;
+    };
+    /**
+     * Collection
+     * @description Properties to return to client
+     */
+    Collection: {
+      /** Name */
+      name: string;
+      /** Collection Id */
+      collection_id: number;
+      /** Images */
+      images: components["schemas"]["ImageURL"][];
+    };
+    /**
+     * CollectionCreate
+     * @description Properties to receive on item creation.
+     */
+    CollectionCreate: {
+      /** Name */
+      name: string;
+    };
+    /**
+     * CollectionUpdate
+     * @description Properties to receive on item update. Don't need id, as PUTting to /parents/{id}
+     */
+    CollectionUpdate: {
+      /** Name */
+      name: string;
     };
     /** Combat */
     Combat: {
@@ -424,8 +485,6 @@ export interface components {
       /** Dimension Y */
       dimension_y: number;
       type?: components["schemas"]["ImageType"] | null;
-      /** Path */
-      path: string;
       /** Image Id */
       image_id: number;
       /** Tags */
@@ -451,8 +510,6 @@ export interface components {
       /** Dimension Y */
       dimension_y: number;
       type?: components["schemas"]["ImageType"] | null;
-      /** Path */
-      path: string;
       /** Image Id */
       image_id: number;
       /** Tags */
@@ -483,8 +540,6 @@ export interface components {
       /** Dimension Y */
       dimension_y: number;
       type?: components["schemas"]["ImageType"] | null;
-      /** Path */
-      path: string;
     };
     /**
      * ImageType
@@ -506,8 +561,6 @@ export interface components {
       /** Dimension Y */
       dimension_y: number;
       type?: components["schemas"]["ImageType"] | null;
-      /** Path */
-      path: string;
       /** Image Id */
       image_id: number;
       /** Tags */
@@ -534,8 +587,6 @@ export interface components {
       dimension_x?: number | null;
       /** Dimension Y */
       dimension_y?: number | null;
-      /** Path */
-      path?: string | null;
       type?: components["schemas"]["ImageType"] | null;
     };
     /** Message */
@@ -560,6 +611,19 @@ export interface components {
        * @default
        */
       message?: string;
+    };
+    /** Page[Collection] */
+    Page_Collection_: {
+      /** Items */
+      items: components["schemas"]["Collection"][];
+      /** Total */
+      total: number | null;
+      /** Page */
+      page: number | null;
+      /** Size */
+      size: number | null;
+      /** Pages */
+      pages?: number | null;
     };
     /** Page[Combat] */
     Page_Combat_: {
@@ -2077,7 +2141,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": unknown;
+          "application/json": components["schemas"]["ImageURL"];
         };
       };
       /** @description Validation Error */
@@ -2235,6 +2299,56 @@ export interface operations {
       /** @description Image not found */
       404: {
         content: never;
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Remove From Collection */
+  remove_from_collection: {
+    parameters: {
+      query: {
+        collection_id: number;
+      };
+      path: {
+        image_id: number;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Image"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Add To Collection */
+  add_to_collection: {
+    parameters: {
+      query: {
+        collection_id: number;
+      };
+      path: {
+        image_id: number;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Image"];
+        };
       };
       /** @description Validation Error */
       422: {
@@ -2404,6 +2518,153 @@ export interface operations {
       200: {
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * List Collections
+   * @description Get all collections
+   */
+  list_collections: {
+    parameters: {
+      query?: {
+        name?: string | null;
+        /** @description Page number */
+        page?: number;
+        /** @description Page size */
+        size?: number;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Page_Collection_"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Create Collection
+   * @description Create a new collection
+   */
+  create_collection: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CollectionCreate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        content: {
+          "application/json": components["schemas"]["Collection"];
+        };
+      };
+      /** @description Conflict Error */
+      409: {
+        content: never;
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Get Empty Collections */
+  get_empty_collections: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Collection"][];
+        };
+      };
+    };
+  };
+  /**
+   * Get Collection
+   * @description Get a single collection by id
+   */
+  get_collection: {
+    parameters: {
+      path: {
+        collection_id: number;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Collection"];
+        };
+      };
+      /** @description Collection not found */
+      404: {
+        content: never;
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Delete Collection */
+  delete_collection: {
+    parameters: {
+      path: {
+        collection_id: number;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Update Collection */
+  update_collection: {
+    parameters: {
+      path: {
+        collection_id: number;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CollectionUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Collection"];
         };
       };
       /** @description Validation Error */

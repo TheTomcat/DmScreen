@@ -2,8 +2,19 @@
 	import { debounce } from '$lib';
 
 	type T = $$Generic;
-	// import AutocompleteItem from './AutocompleteItem.svelte';
+
 	import { createEventDispatcher } from 'svelte';
+	/*
+	Usage:
+	1: Pre-loaded data
+	Supply a list of objects of type T into allItems, as well as two functions:
+	extractName returns a display name for a particular object
+	extractId returns a unique identifier for a particular object
+
+	2: Lazy-loaded data
+	Supply an asynchronous function getData which takes a query string
+	*/
+
 	/**
 	 * The list of items provided to the autocomplete component.
 	 */
@@ -178,9 +189,10 @@
 <svelte:window on:keydown={processKeyStroke} />
 
 <!-- <form autocomplete="off" on:submit|preventDefault={handleFormSubmit}> -->
-<div class="container">
-	<div class="autocomplete">
+<div class="relative w-full">
+	<div class="relative inline-block w-full px-2">
 		<input
+			class="border-2 border-solid border-transparent p-3 m-0 w-full bg-"
 			type="text"
 			{placeholder}
 			autocomplete="off"
@@ -195,9 +207,15 @@
 	</div>
 
 	{#if filteredItems.length > 0}
-		<ul id="autocomplete-items-list">
+		<ul
+			id="autocomplete-items-list"
+			class="absolute m-0 p-0 z-[900] w-full border-[1] border-solid border-gray-300 bg-gray-800"
+		>
 			{#each filteredItems as itemData, i (extractId(itemData))}
-				<li class="autocomplete-items" class:autocomplete-active={i === currentIndex}>
+				<li
+					class="list-none border-b-[1] border-b-solid border-b-gray-300 w-full p-3 cursor-pointer hover:bg-[#81921f] hover:text-white"
+					class:autocomplete-active={i === currentIndex}
+				>
 					<div
 						role="button"
 						tabindex="0"
@@ -226,7 +244,7 @@
 		display: inline-block;
 		width: 100%;
 	}
-	input {
+	/* input {
 		border: 1px solid transparent;
 		background-color: var(--surface-4);
 		padding: var(--size-3);
@@ -235,8 +253,8 @@
 	input[type='text'] {
 		background-color: var(--surface-4);
 		width: 100%;
-	}
-	#autocomplete-items-list {
+	} */
+	.autocomplete-items-list {
 		position: absolute;
 		margin: 0;
 		padding: 0;
