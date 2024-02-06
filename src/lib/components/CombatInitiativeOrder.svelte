@@ -31,14 +31,19 @@
 	import client from '$lib/api/index';
 	import { combat } from '$lib/ws';
 	import * as Popover from '$lib/components/ui/popover';
+	import * as Dialog from '$lib/components/ui/dialog';
 
+	import { Button } from '$lib/components/ui/button';
 	import { createEventDispatcher, onDestroy, tick } from 'svelte';
 	import type { wsController } from '$lib/ws';
 	import Autocomplete from './Autocomplete.svelte';
 	import EditableText from './EditableText.svelte';
-	import Dialog from './Dialog.svelte';
+	import Dialog2 from './Dialog.svelte';
 	import { entityHasData, parseAndCreateCounters } from '$lib/jsonschema';
 	import Statblock from './new/EntityDisplay/Statblock.svelte';
+
+	import * as Table from '$lib/components/ui/table';
+	import { cn } from '$lib/utils';
 
 	// type Participant = components['schemas']['Participant'];
 	// type Combat = components['schemas']['Combat'];
@@ -49,26 +54,29 @@
 		combat_updated: { combat: Combat };
 	}>();
 
-	let damageDialog: Dialog;
+	// let damageDialog: Dialog;
 	let damaging_participant: Participant | undefined;
 	let damaging: boolean = true;
 	let damageAmount: number = 0;
 	let damageInputField: HTMLInputElement;
 	let popoverOpen = false;
+	let popoverTarget: HTMLButtonElement;
 
-	let conditionsDialog: Dialog;
+	// let conditionsDialog: Dialog2;
+	let conditionsDialogOpen: boolean = false;
 	let conditions_parcipitant: Participant | undefined;
 	let conditionInputField: HTMLInputElement;
 	let conditionsChanged: boolean = false;
 	let conditionToAdd: string = '';
 	let conditions: string[] = [];
 
-	let newCombatantDialog: Dialog;
+	let newCombatantDialog: Dialog2;
 
 	let entities: Entity[] = [];
 	let statblockParticipant: Participant;
 	let statblockEntity: Entity;
-	let statblockDialog: Dialog;
+	// let statblockDialog: Dialog2
+	let statblockDialogOpen: boolean = false;
 
 	const Conditions = [
 		'Blinded',
@@ -141,11 +149,17 @@
 	const addNewQuickCombatant = (e: CustomEvent<{ value: string }>) => {
 		// console.log(e);
 	};
-	const showDamagingDialog = (damagingMode: boolean, participant: Participant) => {
+	const showDamagingDialog = (
+		damagingMode: boolean,
+		participant: Participant,
+		target: HTMLButtonElement
+	) => {
 		damaging = damagingMode;
 		damageAmount = 0;
 		damaging_participant = participant;
 		// showModal = true;
+		popoverTarget = target;
+		console.log(popoverTarget);
 		popoverOpen = true;
 		// damageDialog.open();
 		// tick().then(() => damageInputField.focus());
@@ -163,14 +177,16 @@
 				dispatch('combat_updated', { combat: $combat });
 			});
 		}
-		damageDialog.close();
+		// damageDialog.close();
+		popoverOpen = false;
 	};
 	const showConditionsDialog = (participant: Participant) => {
 		conditions_parcipitant = participant;
 		conditions = conditions_parcipitant.conditions.split(',').filter((s) => s);
 		conditionToAdd = '';
 		conditionsChanged = false;
-		conditionsDialog.open();
+		// conditionsDialog.open();
+		conditionsDialogOpen = true;
 		tick().then(() => conditionInputField.focus());
 	};
 	const showStatblockDialog = (participant: Participant) => {
@@ -179,7 +195,8 @@
 		if (index == -1) return;
 		console.log('going');
 		statblockEntity = entities[index];
-		statblockDialog.open();
+		// statblockDialog.open();
+		statblockDialogOpen = true;
 	};
 	const setConditions = () => {
 		console.log(conditions);
@@ -190,10 +207,14 @@
 				dispatch('combat_updated', { combat: $combat });
 			});
 		}
-		conditionsDialog.close();
+		// conditionsDialog.close();
+		conditionsDialogOpen = false;
 	};
 	const onDamageKeyDown = (e: KeyboardEvent) => {
-		if (e.key === 'Enter') applyDamage();
+		if (e.key === 'Enter') {
+			console.log(e.key);
+			applyDamage();
+		}
 	};
 
 	let unsubscribe = combat.subscribe((value) => {
@@ -206,32 +227,39 @@
 		if (entities && $combat && $combat.participants)
 			parseAndCreateCounters($combat?.participants, entities);
 	}
+
+	let refs: HTMLButtonElement[] = [];
 </script>
 
-<table style="width: 100%; border-spacing: 0;" class:inactive={!$combat?.is_active}>
-	<thead>
-		<th><div class="icon"><Dices /></div></th>
-		<th><div class="icon"><Shield /></div></th>
-		<th />
-		<th />
-		<th />
-		<th>Name</th>
-		<th>Conditions</th>
-		<th><div class="icon"><Droplets color="red" /></div></th>
-		<th />
-	</thead>
-	<tbody>
+<Table.Root style="width: 100%; border-spacing: 0;">
+	<Table.Header>
+		<Table.Row>
+			<Table.Head class="flex justify-center items-center"><Dices /></Table.Head>
+			<Table.Head><Shield /></Table.Head>
+			<!-- <Table.Head /> -->
+			<Table.Head />
+			<Table.Head />
+			<Table.Head>Name</Table.Head>
+			<Table.Head>Conditions</Table.Head>
+			<Table.Head class="flex justify-center items-center"><Droplets color="red" /></Table.Head>
+			<Table.Head />
+		</Table.Row>
+	</Table.Header>
+	<Table.Body>
 		{#if $combat && $combat.participants}
 			{#each $combat.participants //combat.participants
 				//.filter((p) => p.is_visible || !playerView)
 				.toSorted(sort_participants_naive) as participant, i (participant.participant_id)}
 				<tr
 					animate:flip
-					class:activeparticipant={participant.participant_id == $combat.active_participant_id}
-					class:isHidden={!participant.is_visible}
-					class:PC={participant.is_PC}
+					class={cn('border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted', {
+						activeparticipant: participant.participant_id == $combat.active_participant_id,
+						isHidden: !participant.is_visible,
+						PC: participant.is_PC,
+						NPC: !participant.is_PC
+					})}
 				>
-					<td>
+					<Table.Cell>
 						{#if $combat.is_active}
 							<EditableText
 								value={`${participant.initiative}`}
@@ -247,8 +275,8 @@
 						{:else}
 							-
 						{/if}
-					</td>
-					<td>
+					</Table.Cell>
+					<Table.Cell>
 						<EditableText
 							value={`${participant.ac}`}
 							callback={(v) => {
@@ -258,18 +286,18 @@
 								});
 							}}
 						/>
-					</td>
-					<td>
-						<div style="display: flex; flex-direction: row; justify-content: center;">
+					</Table.Cell>
+					<!-- <Table.Cell>
+						<div class="flex flex-row justify-center">
 							<span
 								class="circle"
 								style={`background: ${participant.colour || 'unset'}; float: left;`}
 							/>
 						</div>
-					</td>
+					</Table.Cell> -->
 
-					<td>
-						<div style="display: flex; flex-direction: row; justify-content: center;">
+					<Table.Cell>
+						<div class="flex flex-row justify-center">
 							<button
 								class="icon"
 								on:click={() => {
@@ -300,17 +328,17 @@
 									/>{:else}<RefreshCwOff color={'maroon'} />{/if}
 							</button>
 						</div>
-					</td>
-					<td>
+					</Table.Cell>
+					<Table.Cell>
 						<!-- {#await Promise.all(loadEntitiesFromCombat($combat)) then } 
 							 -->
 						{#if entities && participantHasEntityData(participant)}
 							<button class="icon" on:click={() => showStatblockDialog(participant)}>
-								<MessageSquareCode />
+								<MessageSquareCode class="h-4 w-4 mr-1" />
 							</button>
 						{/if}
-					</td>
-					<td>
+					</Table.Cell>
+					<Table.Cell>
 						<span class:dead={is_dead(participant)} class:player={participant.is_PC}>
 							<EditableText
 								value={participant.name}
@@ -322,8 +350,8 @@
 								}}
 							/>
 						</span>
-					</td>
-					<td
+					</Table.Cell>
+					<Table.Cell
 						on:click={() => {
 							showConditionsDialog(participant);
 						}}
@@ -337,14 +365,18 @@
 							{participant.conditions.split(',').join(', ')}
 							<!-- {#each participant.conditions.split(',') as condition}{condition}{/each} -->
 						</div>
-					</td>
+					</Table.Cell>
 
-					<td style="display: flex; justify-content: center; max-inline-size: unset;">
-						<div class="damage">
-							<button on:click={() => showDamagingDialog(true, participant)}>
-								<SwordsIcon color={'red'} />
-							</button>
-							<div class="hitpoints">
+					<Table.Cell style="display: flex; justify-content: center; max-inline-size: unset;">
+						<div class="grid grid-cols-[1fr,2fr,1fr] gap-1">
+							<Button
+								bind:el={refs[i]}
+								variant="ghost"
+								on:click={() => showDamagingDialog(true, participant, refs[i])}
+							>
+								<SwordsIcon class="h-4 w-4" color={'red'} />
+							</Button>
+							<div class="text-center">
 								<!-- <EditableText
 									value={`${remainingHp(participant)}`}
 									callback={(v) => {
@@ -371,15 +403,18 @@
 									<span class="remaininghp" style="width: {remainingHpPercent(participant)}%" />
 								</span>
 							</div>
-							<button on:click={() => showDamagingDialog(false, participant)}>
-								<CrossIcon color={'green'} />
-							</button>
+							<Button
+								variant="ghost"
+								on:click={() => showDamagingDialog(false, participant, refs[i])}
+							>
+								<CrossIcon class="w-4 h-4" color={'green'} />
+							</Button>
 						</div>
-					</td>
-					<td
-						><button
-							class="icon"
-							style="padding: var(--size-1);"
+					</Table.Cell>
+					<Table.Cell>
+						<Button
+							variant="ghost"
+							class="p-1"
 							on:click={() => {
 								if ($combat?.active_participant_id == participant.participant_id) {
 									let p = get_next_alive_participant_id(
@@ -398,16 +433,16 @@
 							}}
 						>
 							<X />
-						</button></td
-					>
+						</Button>
+					</Table.Cell>
 				</tr>
 			{/each}
 		{/if}
-	</tbody>
-	<tfoot>
-		<tr
-			><td colspan="3">Add Combatant</td>
-			<td colspan="4"
+	</Table.Body>
+	<Table.Footer>
+		<Table.Row
+			><Table.Cell colspan={3}>Add Combatant</Table.Cell>
+			<Table.Cell colspan={4}
 				><Autocomplete
 					getData={getEntities}
 					{extractId}
@@ -416,40 +451,49 @@
 					on:submitnew={addNewQuickCombatant}
 					allowCreation={false}
 					placeholder={'Search for a Combatant'}
-				/></td
+				/></Table.Cell
 			>
-			<td colspan="2"><button><PlusSquare />Quick-add combatant</button></td>
-		</tr>
-	</tfoot>
-</table>
+			<Table.Cell colspan={2}><button><PlusSquare />Quick-add combatant</button></Table.Cell>
+		</Table.Row>
+	</Table.Footer>
+</Table.Root>
 <!-- {JSON.stringify(entities)} -->
-<Dialog mode="mega" showMenu={false} bind:this={statblockDialog}>
-	<Statblock slot="content" entity={statblockEntity} participant={statblockParticipant} />
-</Dialog>
+<!-- <Dialog mode="mega" showMenu={false} bind:this={statblockDialog}>
+</Dialog> -->
 
-<Popover.Root bind:open={popoverOpen}>
-	<Popover.Trigger>t</Popover.Trigger>
-	<Popover.Content>
-		<div>
-			{#if damaging_participant && damaging_participant.participant_id}
+<Statblock
+	bind:dialogOpen={statblockDialogOpen}
+	entity={statblockEntity}
+	participant={statblockParticipant}
+/>
+
+<Dialog.Root bind:open={popoverOpen}>
+	<!-- <Popover.Trigger bind:el={popoverTarget}>t</Popover.Trigger> -->
+	<Dialog.Content class="overflow-scroll">
+		{#if damaging_participant && damaging_participant.participant_id}
+			<Dialog.Header>
 				<h5>Apply {`${damaging ? 'damage' : 'healing'}`} to {damaging_participant.name}</h5>
+			</Dialog.Header>
+			<div class="flex gap-2">
+				<!-- <h5>Apply {`${damaging ? 'damage' : 'healing'}`} to {damaging_participant.name}</h5> -->
 				<input
+					class="flex h-10 w-[180px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 					placeholder={`Apply ${damaging ? 'damage' : 'healing'}`}
 					bind:value={damageAmount}
 					bind:this={damageInputField}
 					on:keydown={onDamageKeyDown}
 				/>
 				{#if damaging}
-					<button on:click={applyDamage}><SwordsIcon color={'red'} />Apply Damage</button>
+					<Button on:click={applyDamage}><SwordsIcon color={'red'} />Apply Damage</Button>
 				{:else}
-					<button on:click={applyDamage}><CrossIcon color={'green'} />Apply Healing</button>
+					<Button on:click={applyDamage}><CrossIcon color={'green'} />Apply Healing</Button>
 				{/if}
-			{/if}
-		</div>
-	</Popover.Content>
-</Popover.Root>
+			</div>
+		{/if}
+	</Dialog.Content>
+</Dialog.Root>
 
-<Dialog mode="mega" showMenu={false} bind:this={damageDialog}>
+<!-- <Dialog mode="mega" showMenu={false} bind:this={damageDialog}>
 	<div slot="content">
 		{#if damaging_participant && damaging_participant.participant_id}
 			<h5>Apply {`${damaging ? 'damage' : 'healing'}`} to {damaging_participant.name}</h5>
@@ -466,15 +510,19 @@
 			{/if}
 		{/if}
 	</div>
-</Dialog>
+</Dialog> -->
 
-<Dialog mode="mega" showMenu={false} bind:this={conditionsDialog}>
-	<div slot="header">
-		{#if conditions_parcipitant}
-			<h5>Apply condition to {conditions_parcipitant.name}</h5>
-		{/if}
-	</div>
-	<div slot="content">
+<!-- <Dialog mode="mega" showMenu={false} bind:this={conditionsDialog}> -->
+<Dialog.Root bind:open={conditionsDialogOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Conditions</Dialog.Title>
+			<Dialog.Description>
+				{#if conditions_parcipitant}
+					<h5>Apply condition to {conditions_parcipitant.name}</h5>
+				{/if}
+			</Dialog.Description>
+		</Dialog.Header>
 		{#if conditions_parcipitant && conditions_parcipitant.participant_id}
 			<div style="height: 300px;">
 				<div>
@@ -522,24 +570,39 @@
 					}}
 					on:emptysubmit={() => {
 						setConditions();
-						conditionsDialog.close();
+						// conditionsDialog.close();
+						conditionsDialogOpen = false;
 					}}
 				/>
 			</div>
 		{/if}
+		<Dialog.Footer>
+			<Button on:click={setConditions}>Set</Button>
+			<Button
+				variant="destructive"
+				on:click={() => {
+					conditionsDialogOpen = false;
+				}}>Cancel</Button
+			>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+<!-- <div slot="header">
+	</div>
+	<div slot="content">
+		
 	</div>
 	<div slot="menu">
-		<button on:click={setConditions}>Set</button>
-		<button on:click={conditionsDialog.close}>Cancel</button>
 	</div>
-</Dialog>
-<Dialog mode="mega" showMenu={false} bind:this={newCombatantDialog}>
+</Dialog> -->
+
+<Dialog2 mode="mega" showMenu={false} bind:this={newCombatantDialog}>
 	<div slot="header">
 		<PlusSquare />
 		<h5>Quick-Add Combatant</h5>
 	</div>
 	<div slot="content" />
-</Dialog>
+</Dialog2>
 
 <style>
 	/* table.inactive * {

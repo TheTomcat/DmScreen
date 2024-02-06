@@ -20,9 +20,11 @@ export type RollMode = 'default' | 'random' | 'min' | 'max' | 'one';
 
 type Image = components['schemas']['Image'];
 type ImageURL = components['schemas']['ImageURL'];
+type ImageType = components['schemas']['ImageType'];
 type Message = components['schemas']['Message'];
 type Tag = components['schemas']['Tag'];
 type Entity = components['schemas']['Entity'];
+type EntityByID = components['schemas']['EntityByID'];
 type Participant = components['schemas']['Participant'];
 type ParticipantUpdate = components['schemas']['ParticipantUpdate'];
 type Combat = components['schemas']['Combat'];

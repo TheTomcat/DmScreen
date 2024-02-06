@@ -13,8 +13,9 @@
 	import { ImagePlus, Tag, Trash2 } from 'lucide-svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import ImageTypeSelectBox from '$lib/components/ImageTypeSelectBox.svelte';
+	import type { ImageType } from '../../../../../app';
 
-	let selectedType: string | null | undefined = 'backdrop';
+	let selectedType: ImageType | null | undefined = 'backdrop';
 	// type FileList = {
 	// 	accepted: File[];
 	// 	rejected: File[];
@@ -83,8 +84,8 @@
 						// @ts-ignore
 						src: e.target.result as string,
 						name: image.name,
-						url: `/manager?image=${image.id}`,
-						id: image.id
+						url: `/manager?image=${image.image_id}`,
+						id: image.image_id
 					};
 					uploadedImageElements = [...uploadedImageElements, i];
 				};
@@ -152,6 +153,5 @@ Image Type: <ImageTypeSelectBox bind:selected={selectedType} onSelectedChange={(
 </div> -->
 
 <style>
-	:global(.custom-dropzone) {
-	}
+
 </style>

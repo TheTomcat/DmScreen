@@ -2,15 +2,28 @@
 	import type { ImageURL } from '../../../app';
 
 	import ImageTag from '$lib/components/ImageTag.svelte';
-	import Dialog from '$lib/components/Dialog.svelte';
+	import { default as Dialog2 } from '$lib/components/Dialog.svelte';
 	import ImageManager from '$lib/components/new/ImageManager.svelte';
 	import { tick } from 'svelte';
 	import { capitalise } from '$lib';
 	import ImageGallery from '$lib/components/ImageGallery.svelte';
 	import { flip } from 'svelte/animate';
 	import { quintInOut } from 'svelte/easing';
+	import { Heart } from 'lucide-svelte';
+	import { Button } from '$lib/components/ui/button';
+	import * as Dialog from '$lib/components/ui/dialog';
+	import {
+		favouriteStore,
+		type Favourite,
+		contains,
+		addFavourite,
+		removeFavourite
+	} from '$lib/stores/favouriteStore';
+	import { cn } from '$lib/utils';
+	import { Description } from '$lib/components/ui/card';
 
-	let editImageDialog: Dialog;
+	// let editImageDialog: Dialog2;
+	let editImageDialogOpen: boolean = false;
 	let editImage: ImageURL;
 
 	let searchInput: HTMLInputElement;
@@ -19,7 +32,8 @@
 		editImage = image;
 		console.log(editImage);
 		tick().then(() => {
-			editImageDialog.open();
+			// editImageDialog.open();
+			editImageDialogOpen = true;
 		});
 	};
 </script>
@@ -34,18 +48,47 @@
 		>
 			{#if galleryItems}
 				{#each galleryItems as image (image.image_id)}
+					{@const isFavourite = contains(image)}
 					<button
 						class="grid-rows-subgrid row-span-3 dark:bg-slate-900 rounded-md gap-4 overflow-hidden hover:scale-110 hover:transition-all transition-all"
 						animate:flip={{ duration: 500, easing: quintInOut }}
 						on:click={() => handleClick(image)}
 					>
-						<img
-							class="portrait"
-							src={`/api/${image.thumbnail_url}?width=240`}
-							alt={image.name}
-							width={image.dimension_x}
-							height={image.dimension_y}
-						/>
+						<div class="overlaycontainer relative">
+							<img
+								class="portrait"
+								src={`/api/${image.thumbnail_url}?width=240`}
+								alt={image.name}
+								width={image.dimension_x}
+								height={image.dimension_y}
+							/>
+							<div
+								class="absolute top-0 bottom-0 left-0 right-0 h-full w-full opacity-0 transition-all bg-gray-500 hover:opacity-40 flex flex-row items-start justify-end p-5"
+							>
+								{#key $favouriteStore}
+									<Button
+										class="p-0 m-0 h-[unset]"
+										variant="ghost"
+										on:click={(e) => {
+											e.stopPropagation();
+											if (isFavourite) {
+												removeFavourite(image);
+											} else {
+												addFavourite(image);
+											}
+											image = image;
+											// console.log(image);
+										}}
+									>
+										<Heart
+											class={cn('hover:stroke-red-600', {
+												'fill-red-600': isFavourite
+											})}
+										/>
+									</Button>
+								{/key}
+							</div>
+						</div>
 
 						<h3 class="heading">{image.name}</h3>
 						<div class="information">
@@ -121,7 +164,21 @@
 		{/if}
 	</div>
 </div> -->
-<Dialog mode="mega" bind:this={editImageDialog} on:closed>
+
+<Dialog.Root bind:open={editImageDialogOpen}>
+	<Dialog.Content class="sm:max-w-[800px]">
+		<Dialog.Header>
+			<Dialog.Title>Edit Image</Dialog.Title>
+			<Dialog.Description>Make changes to an image</Dialog.Description>
+		</Dialog.Header>
+		{#if editImage}
+			<ImageManager image={editImage} bind:searchInput />
+		{/if}
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- 
+<Dialog2 mode="mega" bind:this={editImageDialog} on:closed>
 	<section slot="header">
 		<h2>Edit Image</h2>
 	</section>
@@ -130,9 +187,12 @@
 			<ImageManager image={editImage} bind:searchInput />
 		{/if}
 	</svelte:fragment>
-</Dialog>
+</Dialog2> -->
 
 <style>
+	.portrait::after {
+		content: 'asdf';
+	}
 	.filter {
 		padding: var(--size-3);
 		margin: var(--size-3);

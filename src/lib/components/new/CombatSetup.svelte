@@ -1,10 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+
+	import { Button } from '$lib/components/ui/button';
+	import * as Table from '$lib/components/ui/table';
+
+	import * as Dialog from '$lib/components/ui/dialog';
 	import { createEventDispatcher } from 'svelte';
 	import { DicesIcon, Droplets } from 'lucide-svelte';
 	import type { components } from '$lib/api/v1';
 	import { roll_dice, sort_participants_naive } from '$lib';
-	import Dialog from './../Dialog.svelte';
+	// import Dialog from './../Dialog.svelte';
 	import InitiativeRow from './../InitiativeRow.svelte';
 	import HitPointRow from './HitPointRow.svelte';
 
@@ -18,8 +23,9 @@
 	type Participant = components['schemas']['Participant'];
 
 	let participants: Participant[] = [];
-	let dialog: Dialog;
+	// let dialog: Dialog;
 	// export let step: 'initiative' | 'hp' = 'hp';
+	let dialogOpen: boolean = false;
 
 	type Initiative = {
 		participant_id: number;
@@ -33,7 +39,8 @@
 	export const open = (new_participants: Participant[]) => {
 		participants = [...new_participants];
 		updated_participants = [];
-		dialog.open();
+		// dialog.open();
+		dialogOpen = true;
 	};
 
 	const updateParticipants = (partial_participants: PartialParticipant[]) => {
@@ -75,20 +82,6 @@
 		dispatch('setInitiatives', {});
 	};
 
-	// const updateHitpoints = (participant_id: number, max_hp: number, damage: number) => {
-	// 	if (updated_participants.find((p) => p.participant_id === participant_id)) {
-	// 		updated_participants = updated_participants.map((up) => {
-	// 			if (up.participant_id === participant_id) {
-	// 				return { ...up, max_hp, damage };
-	// 			}
-	// 			return up;
-	// 		});
-	// 	} else {
-	// 		updated_participants = [...updated_participants, { participant_id, max_hp, damage }];
-	// 	}
-	// 	dispatch('setHitPoints', {});
-	// };
-
 	const onUpdateInitiative = (e: CustomEvent) => {
 		updateInitiative(e.detail.participant_id, e.detail.initiative, e.detail.initiative_modifier);
 		updateParticipants([
@@ -99,17 +92,6 @@
 			}
 		]);
 	};
-
-	// const onUpdateHitpoints = (e: CustomEvent) => {
-	// 	updateHitpoints(e.detail.participant_id, e.detail.max_hp, e.detail.damage);
-	// 	updateParticipants([
-	// 		{
-	// 			participant_id: e.detail.participant_id,
-	// 			max_hp: e.detail.max_hp,
-	// 			damage: e.detail.damage
-	// 		}
-	// 	]);
-	// };
 
 	const rollInitiative = () => {
 		participants.forEach((p) =>
@@ -145,98 +127,93 @@
 		dispatch('changeParticipantNames', { participants: i });
 	};
 
-	// const healAll = () => {
-	// 	participants.forEach((p) => updateHitpoints(p.participant_id, p.max_hp || 1, 0));
-	// 	updateParticipants(updated_participants);
-	// };
-
 	const submit = () => {
 		// dispatch('changeParticipant', { participants: updated_participants });
 		dispatch('submitForm', {});
+		dialogOpen = false;
 	};
 </script>
 
-<Dialog mode="mega" bind:this={dialog}>
-	<section slot="header">
-		<!-- {#if step == 'initiative'} -->
-		<div class="icon-header">
-			<DicesIcon />
-			<h3>Roll Initiative</h3>
-		</div>
-		<!-- {:else}
-			<div class="icon-header">
-				<Droplets />
-				<h3>Set HP</h3>
+<Dialog.Root bind:open={dialogOpen}>
+	<Dialog.Content class="sm:max-w-[50%] mx-5 overflow-hidden">
+		<Dialog.Header>
+			<!-- <Dialog mode="mega" bind:this={dialog}>
+	<section slot="header"> -->
+			<div class="flex gap-2">
+				<DicesIcon class="h-8 w-8 mr-3" />
+				<h3 class="text-xl">Roll Initiative</h3>
 			</div>
-		{/if} -->
-	</section>
-	<div class="content" slot="content">
-		<!-- {#if step == 'initiative'} -->
-		<div class="initiativebox">
-			<!-- <div class="PCs"> -->
-			<table style="width: 100%">
-				<thead><th colspan="3">PCs</th></thead>
-				<thead><th>Name</th><th>Roll</th><th>Initiative</th></thead>
-				{#each participants as participant (participant.participant_id)}
-					{#if participant.is_PC}
-						<tr>
-							<InitiativeRow bind:participant on:initiative_update={onUpdateInitiative} />
-						</tr>
-					{/if}
-				{/each}
+			<!-- </section> -->
+		</Dialog.Header>
 
-				<thead><th colspan="3">NPCs</th></thead>
-				<thead><th>Name</th><th>Roll</th><th>Initiative</th></thead>
-				{#each participants as participant (participant.participant_id)}
-					{#if !participant.is_PC}
-						<tr>
-							<InitiativeRow bind:participant on:initiative_update={onUpdateInitiative} />
-						</tr>
-					{/if}
-				{/each}
-			</table>
-		</div>
-		<!-- {:else} -->
-		<!-- <div class="initiativebox">
-				<table style="width: 100%">
-					<thead><th>Name (Hit Dice)</th><th>Damage</th><th>Max HP</th></thead>
-					<tr><td colspan="4">PCs</td></tr>
+		<div class="content">
+			<!-- slot="content"> -->
+			<!-- {#if step == 'initiative'} -->
+			<div class="initiativebox">
+				<!-- <div class="PCs"> -->
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Cell colspan={4}>PCs</Table.Cell>
+						</Table.Row>
+						<Table.Row>
+							<Table.Head>Name</Table.Head>
+							<Table.Head>Roll</Table.Head>
+							<Table.Head colspan={2}>Initiative</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<!-- <thead><th colspan="3">PCs</th></thead>
+					<thead><th>Name</th><th>Roll</th><th>Initiative</th></thead> -->
 					{#each participants as participant (participant.participant_id)}
 						{#if participant.is_PC}
-							<tr>
-								<HitPointRow bind:participant on:hitpoint_update={onUpdateHitpoints} />
-							</tr>
+							<Table.Row>
+								<InitiativeRow bind:participant on:initiative_update={onUpdateInitiative} />
+							</Table.Row>
 						{/if}
 					{/each}
-					<tr><td colspan="4">NPCs</td></tr>
+					<Table.Header>
+						<Table.Row>
+							<Table.Cell colspan={4}>PCs</Table.Cell>
+						</Table.Row>
+						<Table.Row>
+							<Table.Head>Name</Table.Head>
+							<Table.Head>Roll</Table.Head>
+							<Table.Head colspan={2}>Initiative</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<!-- <thead><th colspan="3">NPCs</th></thead>
+					<thead><th>Name</th><th>Roll</th><th>Initiative</th></thead> -->
 					{#each participants as participant (participant.participant_id)}
 						{#if !participant.is_PC}
-							<tr>
-								<HitPointRow bind:participant on:hitpoint_update={onUpdateHitpoints} />
-							</tr>
+							<Table.Row>
+								<InitiativeRow bind:participant on:initiative_update={onUpdateInitiative} />
+							</Table.Row>
 						{/if}
 					{/each}
-				</table>
-			</div> -->
-		<!-- {/if} -->
-	</div>
-	<div style="display: flex; justify-content: space-between;" slot="menu">
-		<!-- {#if step == 'hp'} -->
-		<!-- <button on:click|preventDefault={healAll}>Heal all<Droplets /></button>
-			<button on:click={submit}>Submit</button> -->
-		<!-- {:else} -->
-		<button on:click|preventDefault={rollInitiative}><DicesIcon />Roll all</button>
-		<button on:click={submit}>Submit</button>
-		<button
-			on:click={() => {
-				// smartName();
-				console.error('This does not yet work');
-				submit();
-			}}>Submit and AutoName</button
-		>
-		<!-- {/if} -->
-	</div>
-</Dialog>
+				</Table.Root>
+			</div>
+		</div>
+		<Dialog.Footer>
+			<div class="flex justify-between gap-2">
+				<!-- slot="menu"> -->
+
+				<Button variant="secondary" on:click={rollInitiative}
+					><DicesIcon class="w-4 h-4 mr-1" />Roll all</Button
+				>
+				<Button on:click={submit}>Submit</Button>
+				<!-- <button
+					on:click={() => {
+						// smartName();
+						console.error('This does not yet work');
+						submit();
+					}}>Submit and AutoName</button
+				> -->
+			</div>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- </Dialog> -->
 
 <style>
 	.icon-header {
@@ -248,7 +225,7 @@
 		padding-block: var(--size-2);
 	}
 	.initiativebox {
-		min-width: 800px;
+		/* min-width: 800px; */
 		/* max-height: 500px; */
 		display: grid;
 		grid-template-columns: 1fr;

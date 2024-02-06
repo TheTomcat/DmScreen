@@ -2,7 +2,8 @@
 	import { parseAction } from '$lib/jsonschema';
 
 	export let text: string;
-	export let className: string = '';
+	let className: string | undefined | null = undefined;
+	export { className as class };
 </script>
 
 <span class={className}>

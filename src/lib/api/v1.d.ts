@@ -405,6 +405,11 @@ export interface components {
       /** Data */
       data: string | null;
     };
+    /** EntityByID */
+    EntityByID: {
+      /** Entity Id */
+      entity_id: number;
+    };
     /** EntityCreate */
     EntityCreate: {
       /**
@@ -494,6 +499,11 @@ export interface components {
        * @default
        */
       palette?: string | null;
+      /**
+       * Entities
+       * @default []
+       */
+      entities?: components["schemas"]["EntityByID"][];
     };
     /** ImageB64 */
     ImageB64: {
@@ -519,6 +529,11 @@ export interface components {
        * @default
        */
       palette?: string | null;
+      /**
+       * Entities
+       * @default []
+       */
+      entities?: components["schemas"]["EntityByID"][];
       /** B64 */
       b64: string | null;
     };
@@ -570,6 +585,11 @@ export interface components {
        * @default
        */
       palette?: string | null;
+      /**
+       * Entities
+       * @default []
+       */
+      entities?: components["schemas"]["EntityByID"][];
       /** Url */
       url: string;
       /** Thumbnail Url */
@@ -1200,6 +1220,9 @@ export interface operations {
       query?: {
         name?: string | null;
         is_PC?: boolean | null;
+        has_image?: boolean | null;
+        has_data?: boolean | null;
+        cr?: string | null;
         /** @description Page number */
         page?: number;
         /** @description Page size */
@@ -1471,6 +1494,9 @@ export interface operations {
     parameters: {
       query?: {
         title?: string | null;
+        combat_participants_at_least?: number | null;
+        combat_participants_at_most?: number | null;
+        combat_participants_name?: string | null;
         /** @description Page number */
         page?: number;
         /** @description Page size */
@@ -1943,6 +1969,7 @@ export interface operations {
   list_images: {
     parameters: {
       query?: {
+        name?: string | null;
         type?: components["schemas"]["ImageType"] | null;
         types?: string | null;
         /** @description Page number */
@@ -2000,6 +2027,7 @@ export interface operations {
     parameters: {
       query: {
         taglist: number[];
+        name?: string | null;
         type?: components["schemas"]["ImageType"] | null;
         types?: string | null;
         /** @description Page number */

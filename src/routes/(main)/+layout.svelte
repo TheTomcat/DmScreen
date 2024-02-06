@@ -42,7 +42,7 @@
 		padding-inline: 2rem;
 	}
 	main {
-		padding-block: 4rem;
+		/* padding-block: 4rem; */
 	}
 	@media (min-width: 1440px) {
 		.layout {

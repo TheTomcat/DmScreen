@@ -5,8 +5,12 @@
 	import { page } from '$app/stores';
 	import { onDestroy, onMount, tick } from 'svelte';
 	import {
+		AlignCenter,
+		AlignLeft,
+		AlignRight,
 		ArrowLeft,
 		ArrowRight,
+		Bold,
 		ChevronRightSquare,
 		Clipboard,
 		ClipboardCopy,
@@ -17,31 +21,46 @@
 		FileSearch,
 		Hourglass,
 		Image,
+		Italic,
+		LocateOff,
+		MapIcon,
 		Megaphone,
 		MegaphoneOff,
 		PauseOctagon,
-		Play,
 		PlusSquare,
 		RefreshCw,
 		Scroll,
 		ScrollText,
+		Sparkle,
+		Strikethrough,
 		SwissFranc,
 		Swords,
 		UploadCloud,
 		X
 	} from 'lucide-svelte';
-	import { initialise, playerStateStore, combat, wsController } from '$lib/ws';
+	import { Separator, Toolbar } from 'bits-ui';
+	import {
+		initialise,
+		playerStateStore,
+		combat,
+		wsController,
+		getPresets,
+		loadPresetFromObject,
+		savePreset,
+		type Preset
+	} from '$lib/ws';
 	import client from '$lib/api/index';
 	import type { Combat, Participant } from '../../../../app';
 	import { get_next_alive_participant_id, get_top_initiative_id, makeCancelable } from '$lib';
-	import Dialog from '$lib/components/Dialog.svelte';
+	// import Dialog from '$lib/components/Dialog.svelte';
+	import * as Dialog from '$lib/components/ui/dialog';
 
 	import CombatInitiativeOrder from '$lib/components/CombatInitiativeOrder.svelte';
 	import CombatSetup from '$lib/components/new/CombatSetup.svelte';
+	import CombatTable from '$lib/components/new/CombatTable.svelte';
 	import HitPointTable from '$lib/components/new/HitPointTable.svelte';
 	import * as Sheet from '$lib/components/ui/sheet';
 
-	import Pagination from '$lib/components/Pagination.svelte';
 	import {
 		dispatchGeneralCounterEvent,
 		dispatchParticipantCounterEvent
@@ -57,6 +76,13 @@
 	import { cn } from '$lib/utils';
 	import { tweened } from 'svelte/motion';
 	import ImageSelection from '$lib/components/ImageSelection.svelte';
+	import Map from '$lib/components/new/Map.svelte';
+	import Handout from '$lib/components/new/Handout.svelte';
+	import DisplayImage from '$lib/components/new/DisplayImage.svelte';
+	import MapSelect from '$lib/components/new/MapSelect.svelte';
+	import ScrollBox from '$lib/components/ScrollBox.svelte';
+	import * as Popover from '$lib/components/ui/popover';
+	import { Switch } from '$lib/components/ui/switch';
 
 	let announceTimer = tweened(100);
 
@@ -69,21 +95,23 @@
 
 	let session_id: string = $page.params.session_id;
 
-	let currentPage: number = 1;
-	let numPages: number = 1;
-
 	let clientURL: string;
-	let urlBox: Dialog;
+	// let urlBox: Dialog;
+	let urlBoxOpen: boolean = false;
 	let urlBoxInputField: HTMLInputElement;
 
 	let selectionOpen: boolean = false;
-	let imageSelectionMode: 'backdrop' | 'handout' = 'backdrop';
+	let imageSelectionMode: 'backdrop' | 'handout' | 'map' = 'backdrop';
+
+	let presetName: string = '';
+	let presets: Preset[];
 
 	onMount(() => {
 		ws = new wsController(`/live/socket/${session_id}`);
 		// console.log($page.url.origin);
 		clientURL = `${$page.url.origin}/room/${session_id}`;
 		initialise();
+		presets = getPresets();
 	});
 
 	onDestroy(() => {
@@ -94,15 +122,6 @@
 		duration: 250,
 		easing: cubicInOut
 	});
-
-	const getCombats = async (page: number = 1) => {
-		return client.GET('/combat/', { params: { query: { page, size: 10 } } }).then((response) => {
-			if (!response.data) return [];
-			currentPage = response.data.page || 1;
-			numPages = response.data.pages || 1;
-			return response.data.items;
-		});
-	};
 
 	let announce = () => {
 		if (autoClearAnnoucement) {
@@ -228,68 +247,235 @@
 		// ws.updateCombat({ combat: $combat });
 	};
 
-	// const actions = ['Announce', 'Backdrop', 'Message', 'Combat', 'Handout'];
-	// let currentAction = 'Announce';
+	const screens = ['Background', 'Combat', 'Overlays', 'Presets'];
+	let currentScreen = 'Combat';
 
+	const showHide = (display: boolean) => {
+		return display ? 'Hide' : 'Show';
+	};
 	// const beforeUnload = (event: BeforeUnloadEvent) => {};
+	let text: string[];
+	let align: string;
+	let annoucementPopoverOpen: boolean = false;
 </script>
 
 <!-- <svelte:window on:beforeunload={beforeUnload} /> -->
 
 {#if $playerStateStore}
-	<div class="sessioncontainer">
-		<div class="sessionheader">
-			<h1>Session Driver</h1>
+	<div class="flex flex-col justify-start">
+		<div class="flex flex-row items-center justify-between">
+			<h1 class="text-3xl">Session Driver</h1>
+			<Toolbar.Root
+				class="flex gap-2 h-12 min-w-max items-center justify-center rounded-10px  border-border bg-background p-1 shadow-mini"
+			>
+				<Popover.Root portal={null} bind:open={annoucementPopoverOpen}>
+					{#if isAnnouncing}
+						<Button variant="outline" class="w-32" on:click={handleAnnounce}>
+							<div class="flex flex-col w-full">
+								<div class="flex flex-row justify-center">
+									<MegaphoneOff class="w-4 h-4 mr-2" />
+									Clear
+								</div>
+								{#if awaitingCancel}
+									<div class="w-full bg-gray-200 rounded-full h-0.5 dark:bg-gray-700">
+										<div class="bg-blue-600 h-0.5 rounded-full" style="width: {$announceTimer}%" />
+									</div>
+								{/if}
+							</div>
+						</Button>
+					{:else}
+						<Popover.Trigger asChild let:builder>
+							<Button
+								builders={[builder]}
+								variant="outline"
+								class="w-32"
+								on:click={(e) => {
+									if (isAnnouncing) {
+										e.preventDefault();
+										handleAnnounce();
+									}
+								}}
+							>
+								{#if isAnnouncing}
+									<div class="flex flex-col w-full">
+										<div class="flex flex-row justify-center">
+											<MegaphoneOff class="w-4 h-4 mr-2" />
+											Clear
+										</div>
+										{#if awaitingCancel}
+											<div class="w-full bg-gray-200 rounded-full h-0.5 dark:bg-gray-700">
+												<div
+													class="bg-blue-600 h-0.5 rounded-full"
+													style="width: {$announceTimer}%"
+												/>
+											</div>
+										{/if}
+									</div>
+								{:else}
+									<Megaphone class="w-4 h-4 mr-2" />Announce
+								{/if}
+							</Button>
+						</Popover.Trigger>
+					{/if}
+					<Popover.Content class="w-80">
+						<div class="grid gap-4">
+							<div class="space-y-2">
+								<h4 class="font-medium leading-none">Announcement</h4>
+								<p class="text-sm text-muted-foreground">Make an annoucement</p>
+							</div>
+							<div class="grid gap-2">
+								<div class="grid grid-cols-3 items-center gap-4">
+									<Input
+										bind:value={announcement}
+										on:keydown={(e) => {
+											if (e.key == 'Enter') {
+												handleAnnounce();
+												tick().then(() => {
+													annoucementPopoverOpen = false;
+												});
+											}
+										}}
+										placeholder="Announce Message"
+										class="col-span-3"
+									/>
+								</div>
+								<div class="flex items-center justify-end space-x-2">
+									<Label for="autoclear">Automatically Clear</Label>
+									<Switch id="autoclear" bind:checked={autoClearAnnoucement} />
+								</div>
+								<!-- <div class="grid grid-cols-3 items-center gap-4">
+									<Toggle bind:pressed={autoClearAnnoucement} variant="outline" class="col-span-3">
+										<label for="autoclearannounce"></label>
+									</Toggle>
+								</div> -->
+								<div class="grid grid-cols-3 items-center gap-4">
+									<Label for="timeout">Timeout</Label>
+									<Input
+										class="col-span-2"
+										disabled={!autoClearAnnoucement}
+										id="timeout"
+										bind:value={$playerStateStore.announce_timeout}
+										placeholder="Announce Timeout"
+									/>
+								</div>
+								<Button
+									on:click={() => {
+										handleAnnounce();
+										tick().then(() => {
+											annoucementPopoverOpen = false;
+										});
+									}}><Megaphone />Announce</Button
+								>
+							</div>
+						</div>
+					</Popover.Content>
+				</Popover.Root>
+
+				<Separator.Root class="-my-1 mx-1 w-[1px] self-stretch bg-gray-600" />
+
+				<Toggle
+					variant="outline"
+					bind:pressed={$playerStateStore.background_image_display}
+					onPressedChange={(e) => {
+						console.log('change');
+						ws.setBackgroundImage({
+							cycle: $playerStateStore.background_image_cycle,
+							data: $playerStateStore.background_image_data,
+							display: !$playerStateStore.background_image_display,
+							timeout: $playerStateStore.background_image_timeout,
+							image_id: $playerStateStore.background_image_id
+						});
+					}}
+				>
+					<Image class="w-4 h-4" />
+					<!-- {showHide($playerStateStore.background_image_display)} Background -->
+				</Toggle>
+				<Separator.Root class="-my-1 mx-1 w-[1px] self-stretch bg-gray-600" />
+				<Toggle
+					variant="outline"
+					bind:pressed={$playerStateStore.combat_display}
+					onPressedChange={(e) => {
+						ws.showCombat({
+							display: !$playerStateStore.combat_display
+						});
+					}}
+				>
+					<Swords class="w-4 h-4 " />
+					<!-- {showHide($playerStateStore.combat_display)} Combat -->
+				</Toggle>
+
+				<Separator.Root class="-my-1 mx-1 w-[1px] self-stretch bg-gray-600" />
+				<Toggle
+					variant="outline"
+					bind:pressed={$playerStateStore.message_display}
+					onPressedChange={(e) => {
+						ws.setLoadingMessage({
+							cycle: $playerStateStore.message_cycle,
+							display: !$playerStateStore.message_display,
+							timeout: $playerStateStore.message_timeout,
+							message_id: $playerStateStore.message_id
+						});
+					}}
+				>
+					<ScrollText class="w-4 h-4 " />
+					<!-- {showHide($playerStateStore.message_display)} Message -->
+				</Toggle>
+				<Toggle
+					variant="outline"
+					bind:pressed={$playerStateStore.spinner_display}
+					onPressedChange={(e) => {
+						ws.showSpinner({
+							display: !$playerStateStore.spinner_display
+						});
+					}}
+				>
+					<Hourglass class={cn('w-4 h-4 ', $playerStateStore.spinner_display && 'animate-spin')} />
+					<!-- {showHide($playerStateStore.spinner_display)} Loading Spinner -->
+				</Toggle>
+				<Toggle
+					variant="outline"
+					bind:pressed={$playerStateStore.handout_display}
+					onPressedChange={(e) => {
+						ws.setHandout({
+							display: !$playerStateStore.handout_display,
+							handout_id: $playerStateStore.handout_image_id
+						});
+					}}
+					><Scroll class="w-4 h-4 " />
+					<!-- {showHide($playerStateStore.handout_display)} Handout -->
+				</Toggle>
+				<Toggle
+					variant="outline"
+					bind:pressed={$playerStateStore.map_display}
+					onPressedChange={(e) => {
+						ws.setMap({
+							display: !$playerStateStore.map_display,
+							map_id: $playerStateStore.map_image_id,
+							map_data: $playerStateStore.map_data
+						});
+					}}
+					><MapIcon class="w-4 h-4" />
+					<!-- {showHide($playerStateStore.map_display)} Map -->
+				</Toggle>
+				<Separator.Root class="-my-1 mx-1 w-[1px] self-stretch bg-dark-10" />
+			</Toolbar.Root>
 			<div>
 				<Button
 					variant="outline"
 					on:click={() => {
-						urlBox.open();
+						urlBoxOpen = true;
+						// urlBox.open();
 						tick().then(() => {
 							urlBoxInputField.select();
 						});
-					}}><Clipboard class="w-4 h-4 mr-1" />Copy Client URL</Button
+					}}><Clipboard class="w-4 h-4 mr-2" />Copy Client URL</Button
 				>
 			</div>
 		</div>
-		<div class="border-solid border-[1px] rounded-md border-gray-600 p-3 my-3">
-			<!-- Scrollbox component, not really needed but also cool so don't delete -->
-			<!-- <div class="relative">
-				<div class="lg:max-w-none">
-					<div class="mb-4 flex items-center overflow-y-auto pb-3 md:pb-0 gap-3">
-						{#each actions as action, index (index)}
-							{@const isActive = currentAction == action}
-							<Button
-								class={cn(
-									'relative flex h-7 items-center justify-center rounded-full px-4 text-center text-sm transition-colors bg-[unset] hover:text-primary',
-									isActive ? 'font-medium text-primary' : 'text-muted-foreground'
-								)}
-								on:click={() => {
-									currentAction = action;
-								}}
-							>
-								{#if isActive}
-									<div
-										class="absolute inset-0 rounded-full bg-muted"
-										in:send={{ key: 'activetab' }}
-										out:receive={{ key: 'activetab' }}
-									/>
-								{/if}
-								<div class="relative">
-									{action}
-								</div>
-							</Button>
-						{/each}
-					</div>
-				</div>
-			</div> -->
-			<!-- End Scrollbox Component -->
-
-			<!-- <div style="display: flex; justify-content: space-between;">
-				<h3>Session Controls</h3>
-			</div> -->
-			<div class="grid gap-2" style="grid-template-columns: auto 1fr;">
-				<div class="flex flex-col justify-center">Announce:</div>
+		<div class="border-solid border rounded-lg border-gray-600 p-3 my-3">
+			<ScrollBox items={screens} bind:currentItem={currentScreen} />
+			<!-- <div class="grid gap-2" style="grid-template-columns: auto 1fr;"> -->
+			<!-- <div class="flex flex-col justify-center">Announce:</div>
 				<div class="flex gap-3 justify-start">
 					<Input bind:value={announcement} placeholder="Announce Message" class="w-[200px]" />
 
@@ -310,41 +496,164 @@
 							<Megaphone class="w-4 h-4 mr-2" />Announce
 						{/if}
 					</Button>
-					<!-- <Button on:click={announce} variant="outline" class="w-40">
-						<Megaphone class="w-4 h-4 mr-2" />Announce
-					</Button>
-					<Button on:click={clearAnnouncement} variant="outline" disabled={autoClearAnnoucement}>
-						<MegaphoneOff class="w-4 h-4 mr-2" />
-						Clear Announcement
-					</Button> -->
-					<Toggle bind:pressed={autoClearAnnoucement} variant="outline">
-						<label for="autoclearannounce">Automatically Clear</label>
-					</Toggle>
-					<Input
-						bind:value={$playerStateStore.announce_timeout}
-						placeholder="Announce Timeout"
-						class="w-[200px]"
-					/>
+					<div class="flex flex-row gap-3">
+						<Toggle bind:pressed={autoClearAnnoucement} variant="outline">
+							<label for="autoclearannounce">Automatically Clear</label>
+						</Toggle>
+						<Input
+							bind:value={$playerStateStore.announce_timeout}
+							placeholder="Announce Timeout"
+							class="w-[200px]"
+						/>
+					</div>
+				</div> -->
+			{#if currentScreen == 'Overlays'}
+				<div class="grid gap-2" style="grid-template-columns: auto 1fr;">
+					<div class="flex flex-col justify-center">Message:</div>
+					<div class="flex gap-3 justify-start">
+						<!-- <Toggle
+							variant="outline"
+							bind:pressed={$playerStateStore.message_display}
+							onPressedChange={(e) => {
+								ws.setLoadingMessage({
+									cycle: $playerStateStore.message_cycle,
+									display: !$playerStateStore.message_display,
+									timeout: $playerStateStore.message_timeout,
+									message_id: $playerStateStore.message_id
+								});
+							}}
+						>
+							<ScrollText class="w-4 h-4 mr-2" />
+							{showHide($playerStateStore.message_display)} Message
+						</Toggle> -->
+						<Toggle
+							variant="outline"
+							bind:pressed={$playerStateStore.message_cycle}
+							onPressedChange={(e) => {
+								ws.setLoadingMessage({
+									cycle: !$playerStateStore.message_cycle,
+									display: $playerStateStore.message_display,
+									timeout: $playerStateStore.message_timeout,
+									message_id: $playerStateStore.message_id
+								});
+							}}
+						>
+							<RefreshCw class="w-4 h-4 mr-2" />
+							Cycle Message
+						</Toggle>
+						<!-- <Toggle
+							variant="outline"
+							bind:pressed={$playerStateStore.spinner_display}
+							onPressedChange={(e) => {
+								ws.showSpinner({
+									display: !$playerStateStore.spinner_display
+								});
+							}}
+						>
+							<Hourglass
+								class={cn('w-4 h-4 mr-2', $playerStateStore.spinner_display && 'animate-spin')}
+							/>
+							{showHide($playerStateStore.spinner_display)} Loading Spinner
+						</Toggle> -->
+						<Input
+							placeholder="Timeout"
+							bind:value={$playerStateStore.message_timeout}
+							class="w-[200px]"
+						/>
+					</div>
+
+					<div class="flex flex-col justify-center">Handout:</div>
+					<div class="flex gap-3 justify-start">
+						<!-- <Toggle
+							variant="outline"
+							bind:pressed={$playerStateStore.handout_display}
+							onPressedChange={(e) => {
+								ws.setHandout({
+									display: !$playerStateStore.handout_display,
+									handout_id: $playerStateStore.handout_image_id
+								});
+							}}
+							><Scroll class="w-4 h-4 mr-2" />
+							{showHide($playerStateStore.handout_display)} Handout
+						</Toggle> -->
+						<Input
+							placeholder="Handout ID"
+							bind:value={$playerStateStore.handout_image_id}
+							class="w-[200px]"
+						/>
+						<Button
+							variant="secondary"
+							on:click={() => {
+								imageSelectionMode = 'handout';
+								selectionOpen = true;
+							}}><FileSearch class="w-4 h-4 mr-2" />Select Handout...</Button
+						>
+					</div>
+					<div class="flex flex-col justify-center">Map:</div>
+					<div class="flex gap-3 justify-start">
+						<!-- <Toggle
+							variant="outline"
+							bind:pressed={$playerStateStore.map_display}
+							onPressedChange={(e) => {
+								ws.setMap({
+									display: !$playerStateStore.map_display,
+									map_id: $playerStateStore.map_image_id,
+									map_data: $playerStateStore.map_data
+								});
+							}}
+							><MapIcon class="w-4 h-4 mr-2" />
+							{showHide($playerStateStore.map_display)} Map
+						</Toggle> -->
+						<Input
+							placeholder="Map ID"
+							bind:value={$playerStateStore.map_image_id}
+							class="w-[200px]"
+						/>
+						<Button
+							variant="secondary"
+							on:click={() => {
+								imageSelectionMode = 'map';
+								selectionOpen = true;
+							}}><MapIcon class="w-4 h-4 mr-2" />Select Map...</Button
+						>
+						<Button
+							variant="destructive"
+							disabled={$playerStateStore.map_data == undefined}
+							on:click={() => {
+								ws.setMap({
+									map_data: {
+										x: 0.5,
+										y: 0.5,
+										scale: 1,
+										transition: $playerStateStore.map_data?.transition || 1000
+									},
+									display: $playerStateStore.map_display,
+									map_id: $playerStateStore.map_image_id
+								});
+							}}><LocateOff class="h-4 w-4 mr-2" />Reset Map Focus</Button
+						>
+					</div>
 				</div>
-				<div class="flex flex-col justify-center">Backdrop:</div>
+			{:else if currentScreen == 'Background'}
+				<!-- <div class="flex flex-col justify-center">Backdrop:</div> -->
 				<div class="flex gap-3 justify-start">
-					<Toggle
-						variant="outline"
-						bind:pressed={$playerStateStore.background_image_display}
-						onPressedChange={(e) => {
-							console.log('change');
-							ws.setBackgroundImage({
-								cycle: $playerStateStore.background_image_cycle,
-								data: $playerStateStore.background_image_data,
-								display: !$playerStateStore.background_image_display,
-								timeout: $playerStateStore.background_image_timeout,
-								image_id: $playerStateStore.background_image_id
-							});
-						}}
-					>
-						<Image class="w-4 h-4 mr-2" />
-						Show Background
-					</Toggle>
+					<!-- <Toggle
+							variant="outline"
+							bind:pressed={$playerStateStore.background_image_display}
+							onPressedChange={(e) => {
+								console.log('change');
+								ws.setBackgroundImage({
+									cycle: $playerStateStore.background_image_cycle,
+									data: $playerStateStore.background_image_data,
+									display: !$playerStateStore.background_image_display,
+									timeout: $playerStateStore.background_image_timeout,
+									image_id: $playerStateStore.background_image_id
+								});
+							}}
+						>
+							<Image class="w-4 h-4 mr-2" />
+							{showHide($playerStateStore.background_image_display)} Background
+						</Toggle> -->
 					<Toggle
 						variant="outline"
 						bind:pressed={$playerStateStore.background_image_cycle}
@@ -374,7 +683,7 @@
 							selectionOpen = true;
 						}}
 					>
-						<FileSearch class="w-4 h-4 mr-1" />Select Image...
+						<FileSearch class="w-4 h-4 mr-2" />Select Image...
 					</Button>
 					<Input
 						placeholder="Image ID"
@@ -402,59 +711,8 @@
 						}}
 					/>
 				</div>
-				<div class="flex flex-col justify-center">Message:</div>
-				<div class="flex gap-3 justify-start">
-					<Toggle
-						variant="outline"
-						bind:pressed={$playerStateStore.message_display}
-						onPressedChange={(e) => {
-							ws.setLoadingMessage({
-								cycle: $playerStateStore.message_cycle,
-								display: !$playerStateStore.message_display,
-								timeout: $playerStateStore.message_timeout,
-								message_id: $playerStateStore.message_id
-							});
-						}}
-					>
-						<ScrollText class="w-4 h-4 mr-2" />
-						Show Message
-					</Toggle>
-					<Toggle
-						variant="outline"
-						bind:pressed={$playerStateStore.message_cycle}
-						onPressedChange={(e) => {
-							ws.setLoadingMessage({
-								cycle: !$playerStateStore.message_cycle,
-								display: $playerStateStore.message_display,
-								timeout: $playerStateStore.message_timeout,
-								message_id: $playerStateStore.message_id
-							});
-						}}
-					>
-						<RefreshCw class="w-4 h-4 mr-2" />
-						Cycle Message
-					</Toggle>
-					<Toggle
-						variant="outline"
-						bind:pressed={$playerStateStore.spinner_display}
-						onPressedChange={(e) => {
-							ws.showSpinner({
-								display: !$playerStateStore.spinner_display
-							});
-						}}
-					>
-						<Hourglass
-							class={cn('w-4 h-4 mr-2', $playerStateStore.spinner_display && 'animate-spin')}
-						/>
-						Show Loading Spinner
-					</Toggle>
-					<Input
-						placeholder="Timeout"
-						bind:value={$playerStateStore.message_timeout}
-						class="w-[200px]"
-					/>
-				</div>
-				<div class="flex flex-col justify-center">Combat:</div>
+				<!-- {:else if currentScreen == 'Combat'}
+				<div class="flex flex-col justify-center">Combat</div>
 				<div class="flex gap-3 justify-start">
 					<Toggle
 						variant="outline"
@@ -467,94 +725,108 @@
 						}}
 					>
 						<Swords class="w-4 h-4 mr-2" />
-						Show Combat
+						{showHide($playerStateStore.combat_display)} Combat
 					</Toggle>
-				</div>
-				<div class="flex flex-col justify-center">Handout:</div>
-				<div class="flex gap-3 justify-start">
-					<Toggle
-						variant="outline"
-						bind:pressed={$playerStateStore.handout_display}
-						onPressedChange={(e) => {
-							ws.setHandout({
-								display: !$playerStateStore.handout_display,
-								handout_id: $playerStateStore.handout_image_id
-							});
-						}}
-						><Scroll class="w-4 h-4 mr-2" />
-						Show Handout
-					</Toggle>
-					<Input
-						placeholder="Handout ID"
-						bind:value={$playerStateStore.handout_image_id}
-						class="w-[200px]"
-					/>
+				</div> -->
+			{/if}
+			<!-- </div> -->
+			{#if currentScreen == 'Overlays'}
+				<MapSelect
+					on:click={(e) => {
+						console.log(e.detail);
+						ws.setMap({
+							map_data: { ...e.detail, transition: 3000 },
+							display: $playerStateStore.map_display,
+							map_id: $playerStateStore.map_image_id
+						});
+					}}
+				/>
+			{:else if currentScreen == 'Background'}
+				<DisplayImage image_id={$playerStateStore.background_image_id} />
+			{:else if currentScreen == 'Presets'}
+				<div class="flex gap-2">
 					<Button
-						variant="secondary"
 						on:click={() => {
-							imageSelectionMode = 'handout';
-							selectionOpen = true;
-						}}><FileSearch class="w-4 h-4 mr-1" />Select Handout...</Button
+							savePreset(presetName);
+						}}>Save Current State</Button
 					>
+					<Input bind:value={presetName} on:keydown={(e) => {}} />
 				</div>
-			</div>
-		</div>
-		{#if $playerStateStore && !$playerStateStore.combat}
-			<div class="main">
-				Combat
-				{#await getCombats()}
-					Loading combats...
-				{:then combats}
-					<Pagination {currentPage} {numPages} on:change={() => {}} />
-					<table>
-						<thead><th>Id</th><th>Title</th><th>No. participants</th><th>Load</th></thead>
-						<tbody>
-							{#each combats as combat}
-								<tr>
-									<td>{combat.combat_id}</td>
-									<td>{combat.title}</td>
-									<td>{combat.participants.length}</td>
-									<td><button on:click={() => ws.updateCombat({ combat })}><Play /></button></td>
-								</tr>
-							{:else}
-								<tr>
-									<td colspan="4"> No combats found </td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				{/await}
-			</div>
-		{:else if $playerStateStore && $playerStateStore.combat}
-			{#if $combat}
-				<div class="main">
+				<div class="grid grid-cols-[auto,1fr]">
+					{#each presets as preset (preset.key)}
+						<Button
+							on:click={() => {
+								loadPresetFromObject(preset);
+								ws.pushState({ state: $playerStateStore });
+							}}>{preset.key}</Button
+						>
+						<div>
+							Clicking this preset will:
+							{[
+								preset.state.background_image_display
+									? `Show background image ${preset.state.background_image_id}`
+									: preset.state.background_image_id
+									? `Set background image to ${preset.state.background_image_id} (hidden)`
+									: '',
+								preset.state.handout_display
+									? `Show handout image ${preset.state.handout_image_id}`
+									: preset.state.handout_image_id
+									? `Set handout image to ${preset.state.handout_image_id} (hidden)`
+									: '',
+								preset.state.map_display
+									? `Show map image ${preset.state.map_image_id}`
+									: preset.state.map_image_id
+									? `Set map image to ${preset.state.map_image_id} (hidden) @ ${JSON.stringify(
+											preset.state.map_data
+									  )}`
+									: '',
+								preset.state.message_display ? `Show message ${preset.state.message_id}` : '',
+								preset.state.spinner_display ? `Show spinner` : '',
+								preset.state.combat_display ? `Show combat ${preset.state.combat?.combat_id}` : ''
+							]
+								.filter((p) => p)
+								.join(', ')}
+						</div>
+					{/each}
+				</div>
+			{:else if $playerStateStore && !$playerStateStore.combat}
+				<CombatTable
+					{ws}
+					on:select_combat={(e) => {
+						ws.updateCombat({ combat: e.detail.combat });
+					}}
+				/>
+			{:else if $playerStateStore && $playerStateStore.combat}
+				{#if $combat}
+					<!-- <div class="main"> -->
 					<div class="flex justify-between">
 						<h3>Run Combat: {$combat.title}</h3>
 						<div>
-							<button
-								class:checked={manualMode}
+							<Toggle
+								bind:pressed={manualMode}
 								on:click={() => {
 									if (!fresh && $combat) ws.updateCombat({ combat: $combat });
 									manualMode = !manualMode;
-								}}>Manual Mode</button
+								}}>Manual Mode</Toggle
 							>
-							<button
+							<Button
 								disabled={!manualMode}
-								class:checked={!fresh && manualMode}
 								on:click={() => {
 									if (!$combat) return;
 									ws.updateCombat({ combat: $combat });
 									fresh = true;
-								}}><UploadCloud /> Push Update</button
+								}}><UploadCloud class="h-4 w-4 mr-2" /> Push Update</Button
 							>
 						</div>
-						<button on:click={() => ws.suspendCombat()}><ArrowLeft />Change Combat</button>
+						<Button on:click={() => ws.suspendCombat()}
+							><ArrowLeft class="h-4 w-4 mr-2" />Change Combat</Button
+						>
 					</div>
 					{#if !$combat.is_active}
 						<!-- <button on:click={rollHP}><Cross /> Roll HP</button> -->
-						<button on:click={commenceCombat}
-							><Swords /> Commence Combat: Roll for Initiative</button
-						>
+						<Button on:click={commenceCombat}>
+							<Swords class="h-4 w-4 mr-2" /> Commence Combat: Roll for Initiative
+						</Button>
 						<!-- <button
 							on:click={() => {
 								step = 'hp';
@@ -565,7 +837,7 @@
 					{:else}
 						<!-- <button disabled><PauseOctagon /> Suspend Combat</button> -->
 						<div class="flex justify-between items-center">
-							<button
+							<Button
 								on:click={() => {
 									if ($combat && $combat.active_participant_id) {
 										let p = get_next_alive_participant_id(
@@ -580,14 +852,16 @@
 											...p
 										});
 									}
-								}}><ChevronRightSquare /> Advance Combat</button
+								}}
 							>
+								<ChevronRightSquare class="h-4 w-4 mr-2" /> Advance Combat
+							</Button>
 							<div>
 								Round {$combat.round}
 							</div>
 							<div>
-								<button on:click={healAll}><Cross /></button>
-								<button on:click={commenceCombat}><Dices /></button>
+								<Button on:click={healAll}><Cross class="h-4 w-4 mr-2" /></Button>
+								<Button on:click={commenceCombat}><Dices class="h-4 w-4 mr-2" /></Button>
 							</div>
 						</div>
 					{/if}
@@ -598,11 +872,10 @@
 							<HitPointTable controller={ws} />
 						{/if}
 					</div>
-				</div>
+					<!-- </div> -->
+				{/if}
 			{/if}
-
-			<!-- <RunCombat /> -->
-		{/if}
+		</div>
 	</div>
 {:else}
 	An unexpected error occurred. Could not find session_id.
@@ -614,6 +887,7 @@
 <Sheet.Root bind:open={selectionOpen}>
 	<Sheet.Content side="right" class="overflow-y-scroll sm:max-w-[100%]">
 		<ImageSelection
+			imageType={imageSelectionMode}
 			selectSingleImage={imageSelectionMode == 'handout'}
 			on:selection={(e) => {
 				if (imageSelectionMode == 'backdrop') {
@@ -624,11 +898,18 @@
 						timeout: $playerStateStore.background_image_timeout,
 						image_id: $playerStateStore.background_image_id
 					});
-				} else {
+				} else if (imageSelectionMode == 'handout') {
 					if (e.detail.collection) return;
 					ws.setHandout({
 						display: $playerStateStore.handout_display,
 						handout_id: e.detail.imageData
+					});
+				} else if (imageSelectionMode == 'map') {
+					if (e.detail.collection) return;
+					ws.setMap({
+						display: $playerStateStore.map_display,
+						map_id: e.detail.imageData,
+						map_data: undefined
 					});
 				}
 				selectionOpen = false;
@@ -646,154 +927,29 @@
 	/>
 {/if}
 
-<Dialog mode={'mini'} bind:this={urlBox}>
-	<div slot="content" style="display:flex; align-items: center; justify-content: flex-start;">
-		<input class="boxbutton" bind:value={clientURL} readonly={true} bind:this={urlBoxInputField} />
-		<button
-			class="boxbutton"
-			on:click|preventDefault={() => {
-				urlBoxInputField.select();
-				document.execCommand('copy');
-				urlBox.close();
-			}}><ClipboardCopy /></button
-		>
-	</div>
-</Dialog>
+<Dialog.Root bind:open={urlBoxOpen}>
+	<Dialog.Content class="sm:max-w-[425px]">
+		<Dialog.Header>
+			<Dialog.Title>Client URL</Dialog.Title>
+			<Dialog.Description>Click to copy the URL and then send it to the client</Dialog.Description>
+		</Dialog.Header>
+		<div style="display:flex; align-items: center; justify-content: flex-start;">
+			<input
+				class="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+				bind:value={clientURL}
+				readonly={true}
+				bind:this={urlBoxInputField}
+			/>
+			<Button
+				class="boxbutton"
+				on:click={() => {
+					urlBoxInputField.select();
+					document.execCommand('copy');
 
-<style>
-	.checked {
-		background-color: var(--brand-background);
-	}
-	.screen {
-		padding: var(--size-3);
-		margin: var(--size-3);
-		border-radius: var(--radius-3);
-		border: var(--border-size-2) solid var(--gray-8);
-		aspect-ratio: 16 / 9;
-		/* height: 100px; */
-		transition: all 0.2s ease-in-out;
-		cursor: pointer;
-	}
-	.screen:hover {
-		transform: scale(1.1);
-		transition: all 0.2s ease-in-out;
-		border: var(--border-size-2) solid var(--gray-3);
-	}
-	.screen.active {
-		border: var(--border-size-2) solid var(--brand);
-	}
-	.sessioncontainer {
-		display: flex;
-		flex-direction: column;
-		justify-content: flex-start;
-	}
-	.sessionheader {
-		display: flex;
-		flex-direction: row;
-		justify-content: space-between;
-	}
-	.controls {
-		display: grid;
-		grid-template-columns: repeat(5, 1fr);
-	}
-	/* .controls {
-		padding: var(--size-3);
-		margin: var(--size-3);
-		border-radius: var(--radius-3);
-		border: var(--border-size-2) solid var(--gray-8);
-	} */
-	.main {
-		padding: var(--size-3);
-		margin: var(--size-3);
-		/* border-radius: var(--radius-3);
-		border: var(--border-size-2) solid var(--gray-8); */
-	}
-	.container {
-		display: grid;
-		grid-template-columns: 1fr 1fr 1fr 1fr;
-		row-gap: var(--size-3);
-		column-gap: var(--size-3);
-	}
-	.container div * {
-		padding-block: var(--size-2);
-	}
-	.container h1 {
-		grid-column: span 3;
-	}
-	.container h2 {
-		font-size: medium;
-	}
-
-	.combatcontainer {
-		/* position: absolute;
-		width: 100%;
-		height: 100%; */
-		display: grid;
-		column-gap: var(--size-2);
-		row-gap: var(--size-2);
-		/* padding: var(--size-7); */
-		grid-template-columns: 1fr 2fr;
-		grid-template-rows: 1fr minmax(0, 6fr) 0.5fr;
-		/* height: 100%;
-		max-height: 100%; */
-
-		/* background-color: red; */
-	}
-	.overlay {
-		background-color: rgba(216, 216, 216, 0.2);
-		/* opacity: 0.8; */
-		align-self: stretch;
-		justify-self: stretch;
-		border-radius: var(--radius-2);
-		padding: var(--size-3);
-	}
-	.combatants {
-		grid-area: 1 / 1 / 4 / 2;
-		/* background-color: antiquewhite; */
-	}
-	.portrait {
-		grid-area: 2 / 2 / 3 / 3;
-
-		/* background-color: transparent; */
-		/* opacity: 1; */
-	}
-	.upnext {
-		grid-area: 3/2/4/3;
-		text-align: center;
-	}
-	.name {
-		grid-area: 1/2/2/3;
-		font-size: larger;
-		text-align: center;
-		text-shadow: var(--shadow-3);
-	}
-	.messagebox {
-		position: relative;
-		margin: auto;
-		text-align: center;
-		bottom: -40%;
-		left: 0;
-	}
-	.status {
-		position: absolute;
-		bottom: 0;
-		height: 20px;
-		width: 100%;
-		padding-inline: 5px;
-		background-color: rgba(255, 255, 255, 0.4);
-	}
-	.icon-header {
-		display: flex;
-		gap: var(--size-3);
-		align-items: center;
-	}
-	.initiativebox {
-		min-width: 800px;
-		/* max-height: 500px; */
-		display: grid;
-		grid-template-columns: 1fr;
-		justify-content: start;
-		align-items: start;
-		column-gap: var(--size-2);
-	}
-</style>
+					urlBoxOpen = false;
+					// urlBox.close();
+				}}><ClipboardCopy /></Button
+			>
+		</div>
+	</Dialog.Content>
+</Dialog.Root>

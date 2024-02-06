@@ -6,6 +6,7 @@
 		findCounter,
 		setCounter
 	} from '$lib/stores/counterStore';
+	import { cn } from '$lib/utils';
 	import { Ban } from 'lucide-svelte';
 
 	export let id: string;
@@ -32,7 +33,7 @@
 </script>
 
 {#if counter}
-	<span class="counter" style="">
+	<span class="flex flex-row items-baseline justify-start">
 		{#if !abbreviated}
 			<span class="title">{counter.title}</span>
 			<button on:click|preventDefault={() => setCounter(id, 0)} class="pip cancel"
@@ -42,8 +43,12 @@
 		{#each used as pip, i}
 			<button
 				on:click|preventDefault={() => setCounter(id, i + 1)}
-				class="pip circle"
-				class:unused={pip}
+				class={cn(
+					'rounded-full border inline-block mx-1 h-4 w-4 scale pip bg-slate-800 border-gray-200',
+					{
+						'bg-gray-200': pip
+					}
+				)}
 				name={`remaining${i + 1}`}
 			/>
 		{/each}
@@ -51,19 +56,12 @@
 {/if}
 
 <style>
-	.counter {
-		display: flex;
-		flex-direction: row;
-		align-items: center;
-		justify-content: start;
-	}
-	button {
+	/* button {
 		border: unset;
 		background: unset;
 		padding: unset;
 		margin: unset;
-		color: var(--text-2);
-	}
+	} */
 	.circle {
 		border-radius: 50%;
 		border: 1px solid var(--border);
@@ -79,8 +77,5 @@
 		border: solid 1px var(--text-2);
 		box-shadow: var(--shadow-2);
 		background-color: unset;
-	}
-	.unused {
-		background-color: var(--text-2);
 	}
 </style>

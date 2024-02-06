@@ -17,7 +17,8 @@
 		LogIn,
 		Wrench,
 		Settings2,
-		ChevronDown
+		ChevronDown,
+		Heart
 	} from 'lucide-svelte';
 
 	import { Button } from '$lib/components/ui/button';
@@ -106,6 +107,11 @@
 						<DropdownMenu.Item href="/library/collections">
 							<Group class="mr-2 h-4 w-4" />
 							<span>Collections</span>
+							<!-- <DropdownMenu.Shortcut>⌘S</DropdownMenu.Shortcut> -->
+						</DropdownMenu.Item>
+						<DropdownMenu.Item href="/library/favourites">
+							<Heart class="mr-2 h-4 w-4" />
+							<span>Favourites</span>
 							<!-- <DropdownMenu.Shortcut>⌘S</DropdownMenu.Shortcut> -->
 						</DropdownMenu.Item>
 						<DropdownMenu.Item href="/library/entities">

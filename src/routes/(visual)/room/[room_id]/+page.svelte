@@ -14,6 +14,7 @@
 	import client from '$lib/api/index';
 	import type { Image, ImageURL } from '../../../../app';
 	import Handout from '$lib/components/new/Handout.svelte';
+	import Map from '$lib/components/new/Map.svelte';
 	// import BouncingText from '$lib/components/textEffects/BouncingText.svelte';
 	// import GlitchText from '$lib/components/textEffects/GlitchText.svelte';
 	// import SquiggleText from '$lib/components/textEffects/SquiggleText.svelte';
@@ -46,107 +47,132 @@
 	}
 </script>
 
-{#if !room_id}
-	Invalid Room Id
-{:else if $playerStateStore}
-	<!-- {@debug $playerStateStore} -->
-	{#if !$playerStateStore.background_image_display}
-		<BackgroundEffect n={50} />
-	{:else if $playerStateStore.background_image_display}
-		<BackgroundImage
-			on:changed={(e) => {
-				ws.notifyBackgroundImage({ image_id: e.detail.image_id });
-			}}
-		/>
-	{/if}
-	{#if $playerStateStore.spinner_display}
-		<Spinner />
-	{/if}
-	{#if $playerStateStore.message_display}
-		<BackgroundMessage2
-			message_id={$playerStateStore.message_id}
-			cycleMessageTimeout={$playerStateStore.message_timeout}
-			cycleMessage={$playerStateStore.message_cycle}
-		/>
-	{/if}
+<div class="overflow-hidden w-screen h-screen">
+	{#if !room_id}
+		Invalid Room Id
+	{:else if $playerStateStore}
+		<!-- {@debug $playerStateStore} -->
+		{#if !$playerStateStore.background_image_display}
+			<BackgroundEffect n={50} />
+		{:else if $playerStateStore.background_image_display}
+			<BackgroundImage
+				on:changed={(e) => {
+					ws.notifyBackgroundImage({ image_id: e.detail.image_id });
+				}}
+			/>
+		{/if}
+		{#if $playerStateStore.spinner_display}
+			<Spinner />
+		{/if}
+		{#if $playerStateStore.message_display}
+			<BackgroundMessage2
+				message_id={$playerStateStore.message_id}
+				cycleMessageTimeout={$playerStateStore.message_timeout}
+				cycleMessage={$playerStateStore.message_cycle}
+			/>
+		{/if}
 
-	{#if $playerStateStore.combat_display && $combat}
-		<div class="combatcontainer">
-			<div class="overlay combatants">
-				<h3 class="combatheading">{$combat.title}</h3>
-				Round {$combat.round}
-				<PlayerCombatView />
+		{#if $playerStateStore.combat_display && $combat}
+			<div class="combatcontainer">
+				<div class="overlay combatants">
+					<!-- <div class="flex flex-col items-center justify-start" > -->
+
+					<h3 class="text-center text-2xl text-shadow">{$combat.title}</h3>
+					<div class="text-center text-sm text-shadow mb-3">Round {$combat.round}</div>
+					<PlayerCombatView />
+					<!-- </div> -->
+				</div>
+				<div class="overlay name">
+					{#if $activeParticipant}
+						<h1 class="text-shadow text-4xl pb-3">
+							{$activeParticipant.name}
+						</h1>
+						<p>
+							{#if $activeParticipant?.conditions}
+								{#each $activeParticipant.conditions.split(',') as condition}
+									<span class="condition">{capitalise(condition)}</span>
+								{/each}
+							{/if}
+							{#if is_dead($activeParticipant)}
+								<span class="condition">Unconscious</span>
+							{/if}
+						</p>
+					{/if}
+				</div>
+				<div class="portrait">
+					{#if activeParticipantImage}
+						<img
+							src={`/api/${activeParticipantImage.url}`}
+							alt={activeParticipantImage.name}
+							class="shadow-lg"
+						/>
+					{:else}
+						<Spinner centerScreen={false} />
+					{/if}
+				</div>
+				<div class="overlay upnext">
+					{#if $activeParticipant && $combat}
+						<h3>Up Next:</h3>
+						<h2 class="text-2xl text-shadow">
+							{$combat.participants.find(
+								(p) =>
+									$activeParticipant &&
+									$playerStateStore.combat &&
+									p.participant_id ==
+										get_next_PC(
+											$activeParticipant.participant_id,
+											$playerStateStore.combat.participants
+										).next_participant_id
+							)?.name}
+						</h2>
+					{/if}
+				</div>
 			</div>
-			<div class="overlay name">
-				{#if $activeParticipant}
-					<h1>
-						{$activeParticipant.name}
-					</h1>
-					<p>
-						{#if $activeParticipant?.conditions}
-							{#each $activeParticipant.conditions.split(',') as condition}
-								<span class="condition">{capitalise(condition)}</span>
-							{/each}
-						{/if}
-						{#if is_dead($activeParticipant)}
-							<span class="condition">Unconscious</span>
-						{/if}
-					</p>
-				{/if}
+		{/if}
+		<!-- combat={$playerStateStore.combat} /> -->
+		<!-- {:else if $playerStateStore.mode == 'handout'}{:else if $playerStateStore.mode == 'map'} -->
+		{#if $playerStateStore.announce_display}
+			<div class="messagecontainer">
+				<div class="messagebox announcement" transition:scale>
+					<h1 class="text-6xl">{$playerStateStore.announce_text}</h1>
+					<!-- <SquiggleText text={$playerStateStore.announce_text} /> -->
+				</div>
 			</div>
-			<div class="portrait">
-				{#if activeParticipantImage}
-					<img
-						src={`/api/${activeParticipantImage.url}`}
-						alt={activeParticipantImage.name}
-						class="shadow-lg"
-					/>
-				{:else}
-					<Spinner centerScreen={false} />
-				{/if}
+		{/if}
+		{#if $playerStateStore.handout_display}
+			<div class="handoutcontainer">
+				<div class="messagebox handoutbox h-[90vh]" transition:scale>
+					<Handout />
+				</div>
 			</div>
-			<div class="overlay upnext">
-				{#if $activeParticipant && $combat}Up Next:
-					<h2>
-						{$combat.participants.find(
-							(p) =>
-								$activeParticipant &&
-								$playerStateStore.combat &&
-								p.participant_id ==
-									get_next_PC(
-										$activeParticipant.participant_id,
-										$playerStateStore.combat.participants
-									).next_participant_id
-						)?.name}
-					</h2>
-				{/if}
+		{/if}
+		{#if $playerStateStore.map_display}
+			<div class="handoutcontainer">
+				<div class="messagebox handoutbox h-[90vh]" transition:scale>
+					<Map />
+				</div>
 			</div>
-		</div>
+		{/if}
 	{/if}
-	<!-- combat={$playerStateStore.combat} /> -->
-	<!-- {:else if $playerStateStore.mode == 'handout'}{:else if $playerStateStore.mode == 'map'} -->
-	{#if $playerStateStore.announce_display}
-		<div class="messagecontainer">
-			<div class="messagebox bg-gray-600" transition:scale>
-				<h1>{$playerStateStore.announce_text}</h1>
-				<!-- <SquiggleText text={$playerStateStore.announce_text} /> -->
-			</div>
-		</div>
-	{/if}
-	{#if $playerStateStore.handout_display}
-		<div class="handoutcontainer">
-			<div class="messagebox handoutbox h-full" transition:scale>
-				<Handout />
-			</div>
-		</div>
-	{/if}
-{/if}
+</div>
 
 <!-- <div class="status" class:debug={debugmode}>
 	{JSON.stringify($playerStateStore)}
 </div> -->
 
 <style>
+	.text-shadow {
+		text-shadow: 0.05em 0 black, 0 0.05em black, -0.05em 0 black, 0 -0.05em black,
+			-0.05em -0.05em black, -0.05em 0.05em black, 0.05em -0.05em black, 0.05em 0.05em black;
+	}
+	.announcement {
+		background: radial-gradient(rgba(150 150 150/ 0.9), rgba(20 20 20/ 0.4));
+		box-shadow: 0.05em 0 black, 0 0.05em black, -0.05em 0 black, 0 -0.05em black,
+			-0.05em -0.05em black, -0.05em 0.05em black, 0.05em -0.05em black, 0.05em 0.05em black;
+
+		text-shadow: 0.05em 0 black, 0 0.05em black, -0.05em 0 black, 0 -0.05em black,
+			-0.05em -0.05em black, -0.05em 0.05em black, 0.05em -0.05em black, 0.05em 0.05em black;
+	}
 	.messagecontainer {
 		backdrop-filter: blur(10px);
 		position: absolute;
@@ -214,7 +240,7 @@
 		column-gap: 2rem;
 		row-gap: 2rem;
 		padding: 2rem;
-		grid-template-columns: 1fr 2fr;
+		grid-template-columns: 2fr 3fr;
 		grid-template-rows: 1fr minmax(0, 6fr) 0.5fr;
 		height: 100%;
 		max-height: 100%;
@@ -261,6 +287,8 @@
 	.upnext {
 		grid-area: 3/2/4/3;
 		text-align: center;
+		padding-top: 0.5rem;
+		background: radial-gradient(rgba(50 50 50/ 0.8), rgb(255 255 255 / 0.2));
 	}
 	.upnext h2 {
 		max-inline-size: unset;

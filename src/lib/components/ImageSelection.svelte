@@ -21,10 +21,18 @@
 	import { cubicInOut, quintInOut } from 'svelte/easing';
 	import type { wsImageData } from '$lib/ws';
 	import ImageGallery from './ImageGallery.svelte';
-
+	import type { components } from '$lib/api/v1';
+	type ImageType = components['schemas']['ImageType'];
 	import { flip } from 'svelte/animate';
+	import { favouriteStore } from '$lib/stores/favouriteStore';
+	import DataTable from '../../routes/(main)/library/images/data-table.svelte';
+	import CollectionSelectionBox from './new/CollectionSelectionBox.svelte';
 
 	export let selectSingleImage: boolean = false;
+	export let imageType: ImageType = 'backdrop';
+	const tabs = ['search', 'collection', 'favourites', 'table'] as const;
+	type Tab = (typeof tabs)[number];
+	export let tabvalue: Tab = 'search';
 
 	const dispatch = createEventDispatcher<{
 		selection:
@@ -32,76 +40,73 @@
 			| { imageData: number; collection: false };
 	}>();
 
-	let open = false;
-	let value = '';
+	// let open = false;
+	// let value = '';
 
-	let tabvalue = 'search';
-
-	let allCollections: Collection[] = [];
+	// let allCollections: Collection[] = [];
 	let currentCollection: Collection | undefined;
 
-	type CollectionResponse = Promise<
-		| {
-				data:
-					| {
-							items: Collection[] | undefined;
-							page: number | undefined;
-							size: number | undefined;
-							pages: number | undefined;
-							total: number | undefined;
-					  }
-					| undefined;
-				response: Response;
-		  }
-		| undefined
-	>;
+	// type CollectionResponse = Promise<
+	// 	| {
+	// 			data:
+	// 				| {
+	// 						items: Collection[] | undefined;
+	// 						page: number | undefined;
+	// 						size: number | undefined;
+	// 						pages: number | undefined;
+	// 						total: number | undefined;
+	// 				  }
+	// 				| undefined;
+	// 			response: Response;
+	// 	  }
+	// 	| undefined
+	// >;
 
-	const _getCollections = async (
-		page: number,
-		size: number,
-		name: string = '',
-		clearCollections: boolean = false
-	): CollectionResponse => {
-		// TODO: Type this properly
-		return client
-			.GET('/collection/', { params: { query: { size, page, name } } })
-			.then((response) => {
-				console.log(response);
-				if (!response.data) return;
-				// if (clearCollections)
-				allCollections = [];
-				allCollections = [...allCollections, ...response.data.items];
-				// console.log(allTags);
-				if ((response.data.page || 1) < (response.data.pages || 1)) {
-					return _getCollections(page + 1, size);
-				}
-			});
-	};
+	// const _getCollections = async (
+	// 	page: number,
+	// 	size: number,
+	// 	name: string = '',
+	// 	clearCollections: boolean = false
+	// ): CollectionResponse => {
+	// 	// TODO: Type this properly
+	// 	return client
+	// 		.GET('/collection/', { params: { query: { size, page, name } } })
+	// 		.then((response) => {
+	// 			console.log(response);
+	// 			if (!response.data) return;
+	// 			// if (clearCollections)
+	// 			allCollections = [];
+	// 			allCollections = [...allCollections, ...response.data.items];
+	// 			// console.log(allTags);
+	// 			if ((response.data.page || 1) < (response.data.pages || 1)) {
+	// 				return _getCollections(page + 1, size);
+	// 			}
+	// 		});
+	// };
 
-	function closeAndFocusTrigger(triggerId: string) {
-		open = false;
-		tick().then(() => {
-			document.getElementById(triggerId)?.focus();
-		});
-	}
+	// function closeAndFocusTrigger(triggerId: string) {
+	// 	open = false;
+	// 	tick().then(() => {
+	// 		document.getElementById(triggerId)?.focus();
+	// 	});
+	// }
 
-	onMount(() => {
-		_getCollections(1, 100).then(() => {
-			console.log(allCollections);
-		});
-	});
+	// onMount(() => {
+	// 	_getCollections(1, 100).then(() => {
+	// 		console.log(allCollections);
+	// 	});
+	// });
 
-	const getCollections = debounce(_getCollections, 100);
+	// const getCollections = debounce(_getCollections, 100);
 
-	$: selectedValue = allCollections.find((c) => c.name === value)?.name ?? 'Select a collection...';
-	$: {
-		if (browser) {
-			value;
-			_getCollections(1, 20, value, true);
-		}
-	}
+	// $: selectedValue = allCollections.find((c) => c.name === value)?.name ?? 'Select a collection...';
+	// $: {
+	// 	if (browser) {
+	// 		value;
+	// 		_getCollections(1, 20, value, true);
+	// 	}
+	// }
 
-	const tabs = ['search', 'collection'];
 	const [send, receive] = crossfade({
 		duration: 250,
 		easing: cubicInOut
@@ -109,7 +114,7 @@
 </script>
 
 <Tabs.Root bind:value={tabvalue}>
-	<Tabs.List class="grid w-full grid-cols-2">
+	<Tabs.List class={`grid w-full grid-cols-4`}>
 		{#each tabs as tab, index (index)}
 			{@const isActive = tab === tabvalue}
 			<Tabs.Trigger
@@ -139,7 +144,7 @@
 				<Card.Description>Search for an image to display</Card.Description>
 			</Card.Header>
 			<Card.Content class="space-y-2 @container">
-				<ImageGallery small={true}>
+				<ImageGallery small={true} defaultImageType={imageType}>
 					<div
 						slot="gallery"
 						let:galleryItems
@@ -176,7 +181,8 @@
 			</Card.Header>
 			<Card.Content class="space-y-2 @container">
 				<div class="flex flex-row items-center justify-between">
-					<Popover.Root bind:open let:ids>
+					<CollectionSelectionBox bind:currentCollection />
+					<!-- <Popover.Root bind:open let:ids>
 						<Popover.Trigger asChild let:builder>
 							<Button
 								builders={[builder]}
@@ -214,7 +220,7 @@
 								</Command.Group>
 							</Command.Root>
 						</Popover.Content>
-					</Popover.Root>
+					</Popover.Root> -->
 					{#if currentCollection && !selectSingleImage}
 						<Tooltip.Root>
 							<Tooltip.Trigger asChild let:builder>
@@ -249,27 +255,93 @@
 			</Card.Content>
 		</Card.Root>
 	</Tabs.Content>
-	<!-- <Tabs.Content value="favourites">
+	<Tabs.Content value="favourites">
 		<Card.Root class="cursor-default">
 			<Card.Header>
-				<Card.Title>Password</Card.Title>
-				<Card.Description>
-					Change your password here. After saving, you'll be logged out.
-				</Card.Description>
+				<Card.Title>Favourites</Card.Title>
+				<Card.Description>Add or remove items from your favourites</Card.Description>
 			</Card.Header>
 			<Card.Content class="space-y-2">
-				<div class="space-y-1">
-					<Label for="current">Current password</Label>
-					<Input id="current" type="password" />
-				</div>
-				<div class="space-y-1">
-					<Label for="new">New password</Label>
-					<Input id="new" type="password" />
+				<div class="grid grid-cols-3 @md:grid-cols-2 @lg:grid-cols-4 gap-4">
+					{#each $favouriteStore as favourite}
+						<button
+							class="dark:bg-slate-900 rounded-md gap-4 overflow-hidden hover:scale-110 hover:transition-all transition-all"
+							on:click={() => {
+								let value = 'collection_id' in favourite ? favourite : favourite.image_id;
+								// @ts-ignore
+								dispatch('selection', { imageData: value, collection: typeof value !== 'number' });
+							}}
+						>
+							<div class="overlaycontainer relative">
+								{#if 'collection_id' in favourite}
+									<img
+										class="portrait collection"
+										src={`/api/${favourite.images[0].thumbnail_url}?width=240`}
+										alt={favourite.images[0].name}
+										width={favourite.images[0].dimension_x}
+										height={favourite.images[0].dimension_y}
+									/>
+								{:else}
+									<img
+										class="portrait"
+										src={`/api/${favourite.thumbnail_url}?width=240`}
+										alt={favourite.name}
+										width={favourite.dimension_x}
+										height={favourite.dimension_y}
+									/>
+								{/if}
+								<div
+									class="absolute top-0 bottom-0 left-0 right-0 h-full w-full opacity-0 transition-all bg-gray-500 hover:opacity-40 flex flex-row items-start justify-end p-5"
+								>
+									<!-- {#key $favouriteStore}
+									<Button
+										class="p-0 m-0 h-[unset]"
+										variant="ghost"
+										on:click={(e) => {
+											e.stopPropagation();
+											if (isFavourite) {
+												removeFavourite(image);
+											} else {
+												addFavourite(image);
+											}
+											image = image;
+											// console.log(image);
+										}}
+									>
+										<Heart
+											class={cn('hover:stroke-red-600', {
+												'fill-red-600': isFavourite
+											})}
+										/>
+									</Button>
+								{/key} -->
+								</div>
+							</div>
+						</button>
+					{/each}
 				</div>
 			</Card.Content>
-			<Card.Footer>
-				<Button>Save password</Button>
-			</Card.Footer>
+			<!-- <Card.Footer>
+				
+			</Card.Footer> -->
 		</Card.Root>
-	</Tabs.Content> -->
+	</Tabs.Content>
+	<Tabs.Content value="table">
+		<Card.Root class="cursor-default">
+			<Card.Header>
+				<Card.Title>Favourites</Card.Title>
+				<Card.Description>Add or remove items from your favourites</Card.Description>
+			</Card.Header>
+			<Card.Content class="space-y-2">
+				<DataTable />
+			</Card.Content>
+		</Card.Root>
+	</Tabs.Content>
 </Tabs.Root>
+
+<style>
+	.collection {
+		box-shadow: 10px -10px 0 -3px #aaa, 10px -10px #333, 20px -20px 0 -3px #aaa, 20px -20px #333,
+			30px -30px 0 -3px #aaa, 30px -30px #333, 40px -40px 0 -3px #aaa, 40px -40px #333;
+	}
+</style>

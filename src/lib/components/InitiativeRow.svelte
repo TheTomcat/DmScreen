@@ -3,6 +3,9 @@
 	import type { components } from '$lib/api/v1';
 	import { renderModifier, roll_dice } from '$lib/index';
 	import { createEventDispatcher } from 'svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
+
+	import Input from '$lib/components/ui/input/input.svelte';
 	type Participant = components['schemas']['Participant'];
 
 	export let participant: Participant;
@@ -30,26 +33,25 @@
 	{participant.name}
 </td>
 <td>
-	<button on:click|preventDefault={roll}><Dices /></button>
+	<Button variant="outline" class="m-1" on:click={roll}><Dices class="w-4 h-4" /></Button>
+</td>
+<td class="text-right">
+	<!-- <div class="dicecell"> -->
+	<!-- <input class="initroller" bind:value= type="number" /> -->
+	{dice}{renderModifier(participant.initiative_modifier || 0)}=
 </td>
 <td>
-	<div class="dicecell">
-		<!-- <input class="initroller" bind:value= type="number" /> -->
-		{dice}{renderModifier(participant.initiative_modifier || 0)}=
-
-		<!-- </td>
-<td> -->
-		<input
-			class="initroller"
-			bind:value={participant.initiative}
-			type="number"
-			on:change={() =>
-				dispatch('initiative_update', {
-					participant_id: participant.participant_id,
-					initiative: participant.initiative
-				})}
-		/>
-	</div>
+	<Input
+		class="w-[100px]"
+		bind:value={participant.initiative}
+		type="number"
+		on:change={() =>
+			dispatch('initiative_update', {
+				participant_id: participant.participant_id,
+				initiative: participant.initiative
+			})}
+	/>
+	<!-- </div> -->
 </td>
 
 <!-- </div> -->

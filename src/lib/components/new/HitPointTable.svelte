@@ -2,16 +2,20 @@
 	import { sort_participants_by_id } from '$lib';
 	import { combat, playerStateStore, type wsController } from '$lib/ws';
 	import { Cross } from 'lucide-svelte';
+	import { Button } from '$lib/components/ui/button';
+	import * as Table from '$lib/components/ui/table';
 	import type { RollMode } from '../../../app';
 
 	import HitPointRow from './HitPointRow.svelte';
+	import * as Select from '$lib/components/ui/select';
+	import DiceRollTypeSelect from '../DiceRollTypeSelect.svelte';
 
 	export let controller: wsController;
 	type RollModeSet = RollMode | 'Set';
 	let hitPointRows: HitPointRow[] = [];
 
-	let rollModePC: RollModeSet;
-	let rollModeNPC: RollModeSet;
+	let rollModePC: RollModeSet; //; label: string };
+	let rollModeNPC: RollModeSet; //; label: string };
 
 	const onUpdateHitpoints = (
 		e: CustomEvent<{ participant_id: number; max_hp: number; damage: number }>
@@ -37,67 +41,86 @@
 </script>
 
 {#if $playerStateStore.combat}
-	<div class="initiativebox">
-		<table style="width: 100%">
-			<thead><th>Name (Hit Dice)</th><th>Damage</th><th>Max HP</th></thead>
-			<tr>
-				<td> <h5>PCs</h5> </td>
-				<td>
-					<button on:click={() => healAll(true)}>Heal all PCs <Cross color="green" /></button>
-				</td>
-				<td
-					>Set all PCs:
-					<select bind:value={rollModePC} on:change={() => rollAll(true, rollModePC)}>
-						<option value="one">1</option>
-						<option value="min">Min</option>
-						<option value="default">Default</option>
-						<option value="random">Roll</option>
-						<option value="max">Max</option>
-						<option value="Set">Set</option>
-					</select></td
+	<!-- <div class="initiativebox"> -->
+	<Table.Root style="width: 100%">
+		<Table.Header
+			><Table.Row>
+				<Table.Head>Name (Hit Dice)</Table.Head><Table.Head>Damage</Table.Head><Table.Head
+					>Max HP</Table.Head
 				>
-			</tr>
-			{#each $playerStateStore.combat.participants.toSorted(sort_participants_by_id) as participant (participant.participant_id)}
-				{#if participant.is_PC}
-					<tr>
-						<HitPointRow
-							bind:participant
-							on:hitpoint_update={onUpdateHitpoints}
-							bind:this={hitPointRows[participant.participant_id]}
-						/>
-					</tr>
-				{/if}
-			{/each}
-			<tr>
-				<td> <h5>NPCs</h5> </td>
-				<td>
-					<button on:click={() => healAll(false)}>Heal all NPCs <Cross color="green" /></button>
-				</td>
-				<td
-					>Set all NPCs:
-					<select bind:value={rollModeNPC} on:change={() => rollAll(false, rollModeNPC)}>
-						<option value="one">1</option>
-						<option value="min">Min</option>
-						<option value="default">Default</option>
-						<option value="random">Roll</option>
-						<option value="max">Max</option>
-						<option value="Set">Set</option>
-					</select></td
-				>
-			</tr>
-			{#each $playerStateStore.combat.participants.toSorted(sort_participants_by_id) as participant (participant.participant_id)}
-				{#if !participant.is_PC}
-					<tr>
-						<HitPointRow
-							bind:participant
-							on:hitpoint_update={onUpdateHitpoints}
-							bind:this={hitPointRows[participant.participant_id]}
-						/>
-					</tr>
-				{/if}
-			{/each}
-		</table>
-	</div>
+			</Table.Row>
+		</Table.Header>
+		<Table.Header>
+			<Table.Row>
+				<Table.Head>
+					<h5>PCs</h5>
+				</Table.Head>
+				<Table.Head>
+					<Button variant="outline" on:click={() => healAll(true)} class="m-1"
+						>Heal all PCs <Cross class="h-4 w-4 ml-1" color="green" />
+					</Button>
+				</Table.Head>
+
+				<Table.Head>
+					<DiceRollTypeSelect
+						bind:value={rollModePC}
+						heading="Select a Roll Mode"
+						placeholder="Set All PCs:"
+						on:change={(e) => {
+							rollAll(true, e.detail.value);
+						}}
+					/>
+				</Table.Head>
+			</Table.Row>
+		</Table.Header>
+		{#each $playerStateStore.combat.participants.toSorted(sort_participants_by_id) as participant (participant.participant_id)}
+			{#if participant.is_PC}
+				<Table.Row>
+					<HitPointRow
+						bind:participant
+						on:hitpoint_update={onUpdateHitpoints}
+						bind:this={hitPointRows[participant.participant_id]}
+					/>
+				</Table.Row>
+			{/if}
+		{/each}
+		<Table.Header>
+			<Table.Row>
+				<Table.Head>
+					<h5>NPCs</h5>
+				</Table.Head>
+				<Table.Head>
+					<Button variant="outline" on:click={() => healAll(false)} class="m-1">
+						Heal all NPCs <Cross class="h-4 w-4 ml-1" color="green" />
+					</Button>
+				</Table.Head>
+
+				<Table.Head>
+					<DiceRollTypeSelect
+						bind:value={rollModeNPC}
+						heading="Select a Roll Mode"
+						placeholder="Set All NPCs:"
+						on:change={(e) => {
+							rollAll(false, e.detail.value);
+						}}
+					/>
+				</Table.Head>
+			</Table.Row>
+		</Table.Header>
+
+		{#each $playerStateStore.combat.participants.toSorted(sort_participants_by_id) as participant (participant.participant_id)}
+			{#if !participant.is_PC}
+				<Table.Row>
+					<HitPointRow
+						bind:participant
+						on:hitpoint_update={onUpdateHitpoints}
+						bind:this={hitPointRows[participant.participant_id]}
+					/>
+				</Table.Row>
+			{/if}
+		{/each}
+	</Table.Root>
+	<!-- </div> -->
 {:else}
 	No Combat Defined
 {/if}

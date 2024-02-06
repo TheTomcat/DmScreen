@@ -1,14 +1,12 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 	import { ChevronRight, ChevronLeft, ChevronsLeft, ChevronsRight } from 'lucide-svelte';
-	import * as Pagination from '$lib/components/ui/pagination';
 	import * as Select from '$lib/components/ui/select';
-	// import type { Task } from "../(data)/schemas";
-	import type { AnyPlugins } from 'svelte-headless-table/lib/types/TablePlugin';
-	import type { TableViewModel } from 'svelte-headless-table';
-	import type { ImageURL } from '../../../../app';
 
-	export let tableModel: TableViewModel<ImageURL, AnyPlugins>;
+	import type { AnyPlugins } from 'svelte-headless-table/plugins';
+	import type { TableViewModel } from 'svelte-headless-table';
+
+	export let tableModel: TableViewModel<any, AnyPlugins>;
 
 	const { pageRows, pluginStates, rows } = tableModel;
 
@@ -76,39 +74,12 @@
 				variant="outline"
 				class="hidden h-8 w-8 p-0 lg:flex"
 				disabled={!$hasNextPage}
-				on:click={() => ($pageIndex = Math.ceil($rows.length / $pageRows.length) - 1)}
+				on:click={(/*Math.ceil($rows.length / $pageRows.length) - 1)*/) =>
+					($pageIndex = $pageCount - 1)}
 			>
 				<span class="sr-only">Go to last page</span>
 				<ChevronsRight size={15} />
 			</Button>
 		</div>
-		<!-- <Pagination.Root
-			count={$pageCount * $pageSize}
-			perPage={$pageSize}
-			let:pages
-			bind:currentPage={$pageIndex}
-		>
-			<Pagination.Content>
-				<Pagination.Item>
-					<Pagination.PrevButton />
-				</Pagination.Item>
-				{#each pages as page (page.key)}
-					{#if page.type === 'ellipsis'}
-						<Pagination.Item>
-							<Pagination.Ellipsis />
-						</Pagination.Item>
-					{:else}
-						<Pagination.Item>
-							<Pagination.Link {page} isActive={$pageIndex == page.value}>
-								{page.value}
-							</Pagination.Link>
-						</Pagination.Item>
-					{/if}
-				{/each}
-				<Pagination.Item>
-					<Pagination.NextButton />
-				</Pagination.Item>
-			</Pagination.Content>
-		</Pagination.Root> -->
 	</div>
 </div>

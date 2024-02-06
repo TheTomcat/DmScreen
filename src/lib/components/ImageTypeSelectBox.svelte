@@ -1,19 +1,21 @@
 <script lang="ts">
 	import * as Select from '$lib/components/ui/select';
+	import type { ImageType } from '../../app';
 
 	import { capitalise } from '$lib';
 	import { cn } from '$lib/utils';
 
-	export let selected: string | null | undefined;
-	export let onSelectedChange: (e: any) => void;
-	type ImageType = {
-		value: string;
+	type ImageTypeA = {
+		value: ImageType;
 		label: string;
 	};
-	const imageTypes: ImageType[] = ['backdrop', 'character', 'map', 'handout'].map((e) => {
-		return { value: e, label: capitalise(e) };
+	const imageTypes: ImageTypeA[] = ['backdrop', 'character', 'map', 'handout'].map((e) => {
+		return { value: e as ImageType, label: capitalise(e) };
 	});
-	let current: ImageType;
+
+	export let selected: ImageType | undefined | null;
+	export let onSelectedChange: (e: any) => void;
+	let current: ImageTypeA;
 
 	let className: string | undefined = undefined;
 	export { className as class };

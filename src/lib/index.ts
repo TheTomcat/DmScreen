@@ -1,4 +1,5 @@
 // place files you want to import through the `$lib` alias in this folder.
+import { writable } from "svelte/store";
 import type { RollMode } from "../app";
 import type { components } from "./api/v1";
 
@@ -88,8 +89,29 @@ export const debounce = (mainFunction: Function, delay: number) => {
     };
 };
 
+export const debounce2 = (mainFunction: Function, delay: number) => {
+    let timer: number;
+    let isLoading = writable(false);
+
+    return {
+        fn: (...args: any[]) => {
+            clearTimeout(timer);
+            isLoading.set(true)
+            timer = setTimeout(() => {
+                mainFunction.apply(this, args);
+                isLoading.set(false)
+            }, delay);
+        },
+        isLoading
+    }
+};
+
 export const capitalise = (text: string): string => {
     return text.slice(0, 1).toUpperCase().concat(text.slice(1))
+}
+export const plural = (num: number, text: string, plural: string | undefined = undefined) => {
+    if (num == 1) return text;
+    return plural ? plural : `${text}s`
 }
 
 export const sort_participants_naive = (a: Participant, b: Participant): number => {
@@ -181,6 +203,13 @@ export function makeCancelable<T>(promise: Promise<T>) {
     };
 };
 
+export const logc = (handle: Function) => {
+    const f = ({ args }: any) => {
+        console.log(args);
+        handle(args)
+    }
+    return f
+}
 
 export const smartName = (current_participant_id: number, participants: Participant[]): string => {
     let name = participants.find(p => p.participant_id == current_participant_id)?.name;

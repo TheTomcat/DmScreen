@@ -11,13 +11,14 @@
 	import ImageTypeSelectBox from '$lib/components/ImageTypeSelectBox.svelte';
 
 	export let small: boolean = false;
+	export let defaultImageType: ImageType = 'backdrop';
 
 	type ImageType = components['schemas']['ImageType'];
 
 	let selectedTags: Tag[] = [];
 	let galleryItems: ImageURL[];
 
-	let imageType: ImageType = 'backdrop';
+	let imageType: ImageType = defaultImageType;
 
 	const getTags = async (q: string) => {
 		return await client.GET('/tag/', { params: { query: { tag: q } } }).then((res) => {
@@ -86,7 +87,7 @@
 	/>
 	<ImageTypeSelectBox
 		class="h-auto"
-		selected="backdrop"
+		selected={defaultImageType}
 		onSelectedChange={(e) => {
 			console.log(e);
 			if (!e) return;

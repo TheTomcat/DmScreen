@@ -64,12 +64,19 @@ type Spells = {
     [level in SpellLevel]?: { slots?: number, spells: string[] }
 } //& { [c in Cantrip]?: { spells: string[] } }
 
+type PerDayEach = '1e' | '2e' | '3e';
+type PerDayTot = '1' | '2' | '3';
+
+type PerDay = PerDayEach | PerDayTot;
+
+
+
 export type SpellcastingDaily = {
     name: string
     headerEntries?: string[]
     footerEntries?: string[]
     will?: string[]
-    daily?: { [perDay: string]: string[] }
+    daily?: { [perDay in PerDay]?: string[] }
     ability: Stat
 }
 
@@ -116,6 +123,7 @@ export type Creature = {
     trait?: ExtText[],
     action?: ExtText[],
     legendary?: ExtText[],
+    mythic?: ExtText[],
 
     senseTags?: Tag[],
     actionTags?: Tag[],
@@ -231,9 +239,10 @@ const proficiencyBonus = {
 }
 
 export const parseAction = (entry: string) => {
-    const re = new RegExp(/\{\@([a-z]+)[\s]*([^\}]+)?\}/, 'g')
+    // const re = new RegExp(/\{\@([a-z]+)[\s]*([^\}]+)?\}/, 'g')
+    const re = new RegExp(/\{\@([a-z]+)[\s]*([^\}\|]+)?(?:\|([^\}]+))*\}/, 'g')
 
-    return entry.replaceAll(re, (a, b, c) => formatAction(b, c))
+    return entry.replaceAll(re, (a, b, c, d) => formatAction(b, c))
 }
 
 type BlockCommand = 'dc' | 'b' | 'i' | 'damage' | 'recharge' | 'book' | 'condition'
@@ -286,6 +295,7 @@ export const renderSize = (c: Creature): string => {
 };
 
 export const renderType = (c: Creature): string => {
+    console.log(c)
     if (typeof c.type == 'string') {
         return c.type;
     }
@@ -451,6 +461,77 @@ export const participantHasEntityData = (p: Participant, entities: Entity[]): bo
 };
 
 /**
+ * Parses the 'name' field of an action/trait etc and returns the cost, i.e.:
+ * Furious Bite (Costs 2 actions) -> 2
+ * @param name the name of the trait
+ * @returns the cost associated, or undefined
+ */
+export const findCost = (name: string): number | undefined => {
+    const re = new RegExp(/costs (\d+) actions/, 'i');
+    let match = name.match(re);
+    if (!match || match.length != 2) return undefined;
+    return parseInt(match[1]);
+};
+
+export const findNumberOfLegendaryResistances = (name: string): number | undefined => {
+    const re = new RegExp(/legendary resistance \((\d+)\/day\)/, 'i');
+    let match = name.match(re);
+    if (!match || match.length != 2) return undefined;
+    return parseInt(match[1]);
+};
+/**
+ * Parse the name field of an action/trait etc and return the 'id' if there is such a thing
+ * @param name 
+ */
+export const parseNameForConsumable = (name: string): { id: string, qty: number, recharge: string } | undefined => {
+    name = name.toLocaleLowerCase()
+    if (name.includes('legendary resistance')) return { id: 'legendary-resistance', qty: findNumberOfLegendaryResistances(name) || 3, recharge: 'day' }
+    if (name.includes('recharge')) {
+        return { id: name.split("(")[0].split("{")[0].trim().replace(' ', '-'), qty: 1, recharge: 'manual' }
+    }
+    if (name.includes('/day')) {
+        return { id: name.split("(")[0].trim(), qty: parseInt(name.split("(")[1].split("/")[0]), recharge: 'day' }
+    }
+    return undefined
+}
+const parseListForConsumable = (p: Participant) => {
+    return (action: ExtText) => {
+        let result = parseNameForConsumable(action.name)
+        if (result) {
+            let { id, qty, recharge } = result;
+            console.log(`${id} - ${p.participant_id}`)
+            createCounter(p, id, action.name, qty, 0, recharge)
+        }
+    }
+}
+
+export const spellNameToID = (spell: string) => {
+    let t = spell.split("}")[0].split(" ").slice(1)
+    return { spellID: t.join("-").toLocaleLowerCase(), spellName: t.join(" ") }
+}
+
+// type stemA = 'legendary-actions' | 'legendary-resistance' | 'spell-slot' | 'spell-day';
+// type stemB = Exclude<SpellLevel,'0'> | '1e' | '2e' | '3e';
+// type stemC = string;
+
+type IDStem =
+    ['legendary-actions'] |
+    ['legendary-resistance'] |
+    ['spell-slot', Exclude<SpellLevel, '0'>] |
+    ['spell-day', PerDayTot] |
+    ['spell-day', PerDayEach, string]
+
+// {a: 'legendary-action', b: undefined, c: undefined} | 
+//             {a: 'legendary-resistance', b: undefined, c: undefined} | 
+//             {a: 'spell-slot', b: Exclude<SpellLevel,'0'>, c: undefined} | 
+//             {a: 'spell-day', b: '1'|'2'|'3', c: undefined} | 
+//             {a: 'spell-day', b: '1e' | '2e' | '3e', c: string}
+
+export const createIDStem = ([a, b, c]: IDStem): string => {
+    return [a, b, c].filter(a => a).join('-')
+}
+
+/**
  * Creates counters as required for each participant without having to render the entire statblock. 
  * @param participants A list of participants, say, from a combat object
  * @param entities The list of entities corresponding to this list of participants. 
@@ -463,22 +544,47 @@ export const parseAndCreateCounters = (participants: Participant[], entities: En
         let data: Creature = entity.data as unknown as Creature;
         if (data?.legendary) {
             console.log(`${participant.participant_id}-legendary-actions`)
-            createCounter(participant, 'legendary-actions', 'Legendary Actions', 3, 0, 'turn')
+            createCounter(participant, createIDStem(['legendary-actions']), 'Legendary Actions', 3, 0, 'turn')
         }
-        if (data?.trait && data.trait.find(t => t.name.includes('Legendary Resistance'))) {
-            console.log(`${participant.participant_id}-legendary-resistances`)
-            createCounter(participant, 'legendary-resistance', 'Legendary Resistance', 3, 0, 'day')
+        // if (data?.trait && data.trait.find(t => t.name.includes('Legendary Resistance'))) {
+        //     let trait = data.trait.find(t => t.name.includes('Legendary Resistance'));
+        //     if (trait) {
+        //         console.log(`${participant.participant_id}-legendary-resistances`)
+        //         createCounter(participant, 'legendary-resistance', 'Legendary Resistance', findNumberOfLegendaryResistances(trait.name) || 3, 0, 'day')
+        //     }
+        // }
+        if (data?.trait) {
+            data.trait.forEach(parseListForConsumable(participant))
         }
-
+        if (data?.action) {
+            data.action.forEach(parseListForConsumable(participant))
+        }
         if (data?.spellcasting && data.spellcasting) {
             data.spellcasting.forEach(spellcasting => {
                 if ('spells' in spellcasting) {
                     Object.entries(spellcasting.spells).forEach(([level, spell]) => {
                         if (spell && spell.slots) {
-                            console.log(`${participant.participant_id}-spell-${level}`)
-                            createCounter(participant, `spell-slot-${level}`, `Level ${level} spells`, spell.slots || 0, 0, 'day')
+                            // console.log(`${participant.participant_id}-spell-${level}`)
+                            createCounter(participant, createIDStem(['spell-slot', level as Exclude<SpellLevel, '0'>]), `Level ${level} spells`, spell.slots || 0, 0, 'day')
                         }
                     })
+                } else if ('daily' in spellcasting) {
+                    if (spellcasting.daily)
+                        Object.entries(spellcasting.daily).forEach((item) => {
+                            let [numPerDay, spells] = item as [PerDay, string[]];
+                            let num = parseInt(numPerDay);
+                            // console.log(`${participant.participant_id}-spell-day-${numPerDay}`)
+                            if (numPerDay.includes('e')) {
+                                spells.forEach(spell => {
+                                    let { spellName, spellID } = spellNameToID(spell);
+                                    numPerDay = numPerDay as PerDayEach
+                                    createCounter(participant, createIDStem(['spell-day', numPerDay, spellID]), spellName, parseInt(numPerDay), 0, 'day')
+                                })
+                            } else {
+                                numPerDay = numPerDay as PerDayTot
+                                createCounter(participant, createIDStem(['spell-day', numPerDay]), numPerDay, parseInt(numPerDay), 0, 'day')
+                            }
+                        })
                 }
             })
         }

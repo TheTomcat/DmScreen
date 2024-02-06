@@ -7,6 +7,15 @@
 	import ImageTag from '$lib/components/ImageTag.svelte';
 	import Input from '../ui/input/input.svelte';
 	import ImageTypeSelectBox from '../ImageTypeSelectBox.svelte';
+	import {
+		addFavourite,
+		contains,
+		favouriteStore,
+		removeFavourite
+	} from '$lib/stores/favouriteStore';
+	import { Button } from '../ui/button';
+	import { Heart } from 'lucide-svelte';
+	import { cn } from '$lib/utils';
 
 	type Image = components['schemas']['ImageURL'];
 	type Tag = components['schemas']['Tag'];
@@ -16,6 +25,8 @@
 	export let image: Image | null;
 	let state: 'loading' | 'error' | 'done' = 'done';
 	export let searchInput: HTMLInputElement;
+
+	$: isFavourite = image !== null ? contains(image) : false;
 
 	const extractId = (t: Tag) => t.tag_id;
 	const extractName = (t: Tag) => t.tag;
@@ -116,13 +127,42 @@
 			{#if state === 'loading'}
 				<div class="loading" />
 			{:else if state === 'done'}
-				<img
-					class="portrait"
-					src={`/api/${image.thumbnail_url}?width=1000`}
-					alt={image.name}
-					width={image.dimension_x}
-					height={image.dimension_y}
-				/>
+				<div class="overlaycontainer relative h-full">
+					<img
+						class="portrait"
+						src={`/api/${image.thumbnail_url}?width=1000`}
+						alt={image.name}
+						width={image.dimension_x}
+						height={image.dimension_y}
+					/>
+					<div
+						class="absolute top-0 bottom-0 left-0 right-0 h-full w-full opacity-0 transition-all bg-gray-500 hover:opacity-40 flex flex-row items-start justify-end p-5"
+					>
+						{#key $favouriteStore}
+							<Button
+								class="p-0 m-0 h-[unset]"
+								variant="ghost"
+								on:click={(e) => {
+									if (!image) return;
+									e.stopPropagation();
+									if (isFavourite) {
+										removeFavourite(image);
+									} else {
+										addFavourite(image);
+									}
+									image = image;
+									// console.log(image);
+								}}
+							>
+								<Heart
+									class={cn('hover:stroke-red-600', {
+										'fill-red-600': isFavourite
+									})}
+								/>
+							</Button>
+						{/key}
+					</div>
+				</div>
 			{/if}
 		</div>
 		<Input

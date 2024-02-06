@@ -4,6 +4,4 @@
 	import { Button } from '$lib/components/ui/button';
 </script>
 
-<ImageSelection />
-
-<Button on:click={() => toast('Hello world')}>Show toast</Button>
+<ImageSelection tabvalue="collection" />

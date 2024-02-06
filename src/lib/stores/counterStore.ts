@@ -19,6 +19,16 @@ export const makeCounterID = (p: Participant, isFor: string): string => {
 export const splitCounterID = (id: string): [string, string, string] => {
     return id.split(sep) as [string, string, string]
 }
+const extractCombatID = (id: string) => {
+    return splitCounterID(id)[0]
+}
+const extractParticipantID = (id: string) => {
+    return splitCounterID(id)[1]
+}
+const extractIsFor = (id: string) => {
+    return splitCounterID(id)[2]
+}
+
 
 export const findCounter = (p: Participant, isFor: string) => {
     return (c: CounterType) => (c.id == makeCounterID(p, isFor))
@@ -29,12 +39,17 @@ export const findCounterById = (id: string) => {
 export const findCountersByParticipant = (p: Participant) => {
     return (c: CounterType) => (splitCounterID(c.id)[1] == `${p.participant_id}`)
 }
-const remaining = (c: CounterType): number => {
+export const remaining = (c: CounterType | undefined): number => {
+    if (!c) return 0
     return c.total - c.numConsumed
 }
 export const isEmpty = (c: CounterType | undefined): boolean => {
     if (!c) return true
     return c.numConsumed >= c.total
+}
+export const isFull = (c: CounterType | undefined): boolean => {
+    if (!c) return true
+    return c.numConsumed == 0
 }
 
 /**
@@ -98,7 +113,7 @@ export const dispatchGeneralCounterEvent = (isFor: string) => {
 export const dispatchParticipantCounterEvent = (participant_id: number, event: string) => {
     counters.update(counters => {
         return counters.map((counter: CounterType) => {
-            return { ...counter, numConsumed: counter.resetOn == event && splitCounterID(counter.id)[1] == `${participant_id}` ? 0 : counter.numConsumed }
+            return { ...counter, numConsumed: counter.resetOn == event && extractParticipantID(counter.id) == `${participant_id}` ? 0 : counter.numConsumed }
         })
     })
 }
@@ -151,6 +166,29 @@ export const resetAllCounters = () => {
     counters.update(counters => {
         return counters.map(counter => {
             return { ...counter, numConsumed: 0 }
+        })
+    })
+}
+
+export const resetCounter = (id: string) => {
+    counters.update(counters => {
+        return counters.map((counter: CounterType) => {
+            return {
+                ...counter,
+                numConsumed: counter.id == id ? 0 : counter.numConsumed
+            }
+        })
+    })
+}
+
+export const resetByParticipant = (p: Participant, isFor: string) => {
+    let id = makeCounterID(p, isFor);
+    counters.update(counters => {
+        return counters.map((counter: CounterType) => {
+            return {
+                ...counter,
+                numConsumed: counter.id == id ? 0 : counter.numConsumed
+            }
         })
     })
 }

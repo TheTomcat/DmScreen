@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { Entity } from '../../../app';
-	import Counter from './Counter.svelte';
-	import EntityBlock from './EntityBlock.svelte';
+	import type { Entity } from '../../../../../app';
+	import Counter from '../Counter.svelte';
+	import EntityBlock from '../../EntityBlock.svelte';
 	import {
 		type Creature,
 		sizes,

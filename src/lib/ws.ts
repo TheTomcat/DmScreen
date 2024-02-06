@@ -1,5 +1,5 @@
 import type { Combat, Entity, Participant, Collection, ParticipantUpdate, ImageURL } from "../app";
-import { writable, type Writable, derived } from "svelte/store";
+import { writable, type Writable, derived, get } from "svelte/store";
 import { persisted } from 'svelte-persisted-store';
 import client from "$lib/api/index";
 import { roll, rollDice } from "$lib";
@@ -9,22 +9,22 @@ let annoucementTimerId: number;
 
 type wsEventHandler = (e: MessageEvent<string>) => void
 
-type wsEventType = "changeMode"
-    | "beginCombat"
-    | "showCombat"
-    | "updateCombat"
-    | "advanceCombat"
-    | "suspendCombat"
-    | "setBackgroundImage"
-    | "setLoadingMessage"
-    | "announce"
-    | "clearAnnouncement"
-    | "showSpinner"
-    | "provideStatus"
-    | "requestStatus"
-    | "notifyBackgroundImage"
-    | "notifyMessage"
-    | "setHandout"
+// type wsEventType = "changeMode"
+//     | "beginCombat"
+//     | "showCombat"
+//     | "updateCombat"
+//     | "advanceCombat"
+//     | "suspendCombat"
+//     | "setBackgroundImage"
+//     | "setLoadingMessage"
+//     | "announce"
+//     | "clearAnnouncement"
+//     | "showSpinner"
+//     | "provideStatus"
+//     | "requestStatus"
+//     | "notifyBackgroundImage"
+//     | "notifyMessage"
+//     | "setHandout"
 
 export type wsPlayerMode = "loading" | "backdrop" | "combat" | "handout" | "map" | "idle";
 export type wsImageData = number | Collection | ImageURL; //number[] | 
@@ -100,10 +100,20 @@ type wsEventNotifyMessage = {
     event: 'notifyMessage'
     message_id: number;
 }
-
-type event = {
-    event: wsEventType
+type wsEventSetMap = {
+    event: 'setMap'
+    display: boolean
+    map_id: number | undefined;
+    map_data: MapData | undefined;
 }
+type wsEventPushState = {
+    event: 'pushState'
+    state: playerState
+}
+
+// type event = {
+//     event: wsEventType
+// }
 
 // type Omit<T, event extends keyof T> = Pick<T, Exclude<keyof T, event>>
 
@@ -126,6 +136,16 @@ export type playerState = {
     announce_display: boolean
     handout_display: boolean
     handout_image_id: number | undefined;
+    map_display: boolean
+    map_image_id: number | undefined;
+    map_data: MapData | undefined;
+}
+
+export type MapData = {
+    x: number,
+    y: number,
+    scale: number,
+    transition: number
 }
 
 export type wsEvent = wsEventChangeMode
@@ -144,7 +164,9 @@ export type wsEvent = wsEventChangeMode
     | wsEventRequestStatus
     | wsEventNotifyBackgroundImage
     | wsEventNotifyMessage
-    | wsEventSetHandout;
+    | wsEventSetHandout
+    | wsEventSetMap
+    | wsEventPushState;
 
 const initialValue: playerState = {
     mode: 'backdrop',
@@ -164,7 +186,10 @@ const initialValue: playerState = {
     announce_timeout: 10000,
     announce_display: false,
     handout_display: false,
-    handout_image_id: undefined
+    handout_image_id: undefined,
+    map_display: false,
+    map_data: undefined,
+    map_image_id: undefined
 }
 
 export const playerStateStore = writable<playerState>(initialValue);
@@ -251,6 +276,12 @@ const handleWSEvent = (e: wsEvent, isClient: boolean = false) => { //) => {
         case "clearAnnouncement":
             playerStateStore.update(clearAnnounce);
             break;
+        case "setMap":
+            playerStateStore.update(makeSetMap(e))
+            break;
+        case "pushState":
+            playerStateStore.set(e.state)
+            break
         default:
             console.error("Unrecognised event", e)
     }
@@ -408,6 +439,19 @@ const makeSuspendCombat = () => {
     }
     return suspendCombat
 }
+const makeSetMap = (data: wsEventSetMap) => {
+    let setMap = (playerState: playerState): playerState => {
+        return {
+            ...playerState,
+            map_display: data.display,
+            map_image_id: data.map_id,
+            map_data: data.map_data
+        }
+    }
+    return setMap
+}
+
+
 
 // TODO: Implement provideStatus and requestStatus
 const makeProvideStatus = (data: wsEventProvideStatus) => {
@@ -543,6 +587,16 @@ export class wsController {
         let event: wsEventSuspendCombat = { event: 'suspendCombat' }
         this.ws.send(JSON.stringify(event))
         handleWSEvent(event);
+    }
+    setMap({ ...e }: Omit<wsEventSetMap, 'event'>) {
+        let event: wsEventSetMap = { ...e, event: 'setMap' }
+        this.ws.send(JSON.stringify(event))
+        handleWSEvent(event)
+    }
+    pushState({ ...e }: Omit<wsEventPushState, 'event'>) {
+        let event: wsEventPushState = { ...e, event: 'pushState' }
+        this.ws.send(JSON.stringify(event))
+        //DO NOT HANDLE WS EVENT HERE - INFINITE LOOP
     }
 
     requestStatus() {
@@ -744,5 +798,37 @@ export class wsController {
     setDamage(participant_id: number, damage: number) {
         return this.updateParticipant(participant_id, { damage })
     }
+
 }
 
+const PRESET_KEY = 'presets';
+export type Preset = { key: string, state: playerState }
+export const savePreset = (name: string) => {
+    let currentState = get(playerStateStore);
+    if (currentState.combat) console.warn("It isn't recommended to save combat. Weird stuff might happen.")
+    let presets: Preset[] = JSON.parse(localStorage.getItem(PRESET_KEY) || '[]');
+    presets = [
+        ...presets.filter(p => p.key.toLocaleLowerCase() !== name.toLocaleLowerCase()),
+        {
+            key: name.toLocaleLowerCase(),
+            state: currentState
+        }
+    ]
+    localStorage.setItem('presets', JSON.stringify(presets))
+}
+
+export const loadPresetByKey = (name: string) => {
+    let presets: Preset[] = JSON.parse(localStorage.getItem(PRESET_KEY) || '[]');
+    let currentState: playerState | undefined = presets.find(p => p.key.toLocaleLowerCase() === name.toLocaleLowerCase())?.state
+    if (currentState) playerStateStore.set(currentState)
+}
+
+export const loadPresetFromObject = (preset: Preset) => {
+    playerStateStore.set(preset.state)
+}
+
+
+export const getPresets = () => {
+    let presets: Preset[] = JSON.parse(localStorage.getItem(PRESET_KEY) || '[]');
+    return presets
+}

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { Entity, Participant } from '../../../app';
-	import Counter from './Counter.svelte';
+	import type { Entity, Participant } from '../../../../../app';
+	import Counter from '../Counter.svelte';
 
 	import {
 		type Creature,
@@ -30,8 +30,8 @@
 	import { renderModifierFromAbilityScore } from '$lib';
 	import { type CounterType, counters, createCounter } from '$lib/stores/counterStore';
 
-	import InjectableHtmlTag from './InjectableHTMLTag.svelte';
-	import CounterConsume from './EntityDisplay/CounterConsume.svelte';
+	import InjectableHtmlTag from '../../InjectableHTMLTag.svelte';
+	import CounterConsume from '../CounterConsume.svelte';
 
 	export let entity: Entity;
 	let participant: Participant = { participant_id: 1, combat_id: 1 } as Participant;
