@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { PlusCircle, Check } from 'lucide-svelte';
+	import { PlusCircle, Check, Filter } from 'lucide-svelte';
 	import * as Command from '$lib/components/ui/command';
 	import * as Popover from '$lib/components/ui/popover';
 	import { Button } from '$lib/components/ui/button';
@@ -28,7 +28,7 @@
 <Popover.Root bind:open>
 	<Popover.Trigger asChild let:builder>
 		<Button builders={[builder]} variant="outline" size="sm" class="h-8 border-dashed">
-			<PlusCircle class="mr-2 h-4 w-4" />
+			<Filter class="mr-2 h-4 w-4" />
 			{title}
 
 			{#if filterValues.length > 0}

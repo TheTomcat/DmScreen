@@ -1,599 +1,345 @@
-import { capitalise, renderModifier } from "$lib"
-import type { Combat, Entity, Participant } from "../app"
-import { createCounter, makeCounterID } from "./stores/counterStore"
+import { z } from "zod"
 
-export const stats = ["str", "dex", "con", "int", "wis", "cha"] as const
-export type Stat = typeof stats[number]
-type LongStat = "strength" | "dexterity" | "constitution" | "intelligence" | "wisdom" | "charisma"
+export const statSchema = z.union([
+    z.literal("str"),
+    z.literal("dex"),
+    z.literal("con"),
+    z.literal("int"),
+    z.literal("wis"),
+    z.literal("cha")
+])
 
-export const skills = ["athletics", "acrobatics", "sleight of hand", "stealth", "arcana", "history", "investigation", "nature", "religion", "animal handling", "insight", "medicine", "perception", "survival", "deception", "intimidation", "performance", "persuasion"] as const;
-export type Skill = typeof skills[number]
+const longStatSchema = z.union([
+    z.literal("strength"),
+    z.literal("dexterity"),
+    z.literal("constitution"),
+    z.literal("intelligence"),
+    z.literal("wisdom"),
+    z.literal("charisma")
+])
 
-type Conditions = 'stunned' | 'prone' | 'incapacitated' | 'deafened' | 'petrified' | 'paralyzed' | 'charmed' | 'poisoned' | 'unconscious' | 'invisible' | 'restrained' | 'blinded' | 'frightened' | 'exhaustion' | "grappled"
+export const skillSchema = z.union([
+    z.literal("athletics"),
+    z.literal("acrobatics"),
+    z.literal("sleight of hand"),
+    z.literal("stealth"),
+    z.literal("arcana"),
+    z.literal("history"),
+    z.literal("investigation"),
+    z.literal("nature"),
+    z.literal("religion"),
+    z.literal("animal handling"),
+    z.literal("insight"),
+    z.literal("medicine"),
+    z.literal("perception"),
+    z.literal("survival"),
+    z.literal("deception"),
+    z.literal("intimidation"),
+    z.literal("performance"),
+    z.literal("persuasion")
+])
 
-export const damageTypes = ['cold', 'poison', 'necrotic', 'piercing', 'fire', 'thunder', 'bludgeoning', 'slashing', 'lightning', 'radiant', 'acid', 'psychic', 'force'] as const
-// const firstLetter = (p: damageTypes as string) => p.substring(0,1)
-// const damageTagTypes = damageTypes.map(firstLetter) as const
-type DamageType = typeof damageTypes[number]
+const conditionsSchema = z.union([
+    z.literal("stunned"),
+    z.literal("prone"),
+    z.literal("incapacitated"),
+    z.literal("deafened"),
+    z.literal("petrified"),
+    z.literal("paralyzed"),
+    z.literal("charmed"),
+    z.literal("poisoned"),
+    z.literal("unconscious"),
+    z.literal("invisible"),
+    z.literal("restrained"),
+    z.literal("blinded"),
+    z.literal("frightened"),
+    z.literal("exhaustion"),
+    z.literal("grappled")
+])
 
-export const spelllevels = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"] as const
-export type SpellLevel = typeof spelllevels[number]//"0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+export const damageTypeSchema = z.union([
+    z.literal("cold"),
+    z.literal("poison"),
+    z.literal("necrotic"),
+    z.literal("piercing"),
+    z.literal("fire"),
+    z.literal("thunder"),
+    z.literal("bludgeoning"),
+    z.literal("slashing"),
+    z.literal("lightning"),
+    z.literal("radiant"),
+    z.literal("acid"),
+    z.literal("psychic"),
+    z.literal("force")
+])
 
-export const sizes: { [size: string]: string } = { 'T': 'tiny', 'S': 'small', 'M': 'medium', 'L': 'large', 'H': 'huge', 'G': 'gargantuan' }
-export type Size = keyof typeof sizes
+export const spellLevelSchema = z.union([
+    z.literal("0"),
+    z.literal("1"),
+    z.literal("2"),
+    z.literal("3"),
+    z.literal("4"),
+    z.literal("5"),
+    z.literal("6"),
+    z.literal("7"),
+    z.literal("8"),
+    z.literal("9")
+])
 
-type DurationType = 'action' | "minute" | "hour" | "day" | "round" | "day" | "bonus" | "reaction" | "year" | "week" | "turn"
+export const sizeSchema = z.union([
+    z.literal("T"),
+    z.literal("S"),
+    z.literal("M"),
+    z.literal("L"),
+    z.literal("H"),
+    z.literal("G")
+])
 
-export const speeds = ["walk", "fly", "burrow", "swim", "climb"] as const
-export type Speed = typeof speeds[number]
+const durationTypeSchema = z.union([
+    z.literal("action"),
+    z.literal("minute"),
+    z.literal("hour"),
+    z.literal("day"),
+    z.literal("round"),
+    z.literal("day"),
+    z.literal("bonus"),
+    z.literal("reaction"),
+    z.literal("year"),
+    z.literal("week"),
+    z.literal("turn")
+])
 
-export type qSpeed = number | { number: number, condition: string }
+export const speedSchema = z.union([
+    z.literal("walk"),
+    z.literal("fly"),
+    z.literal("burrow"),
+    z.literal("swim"),
+    z.literal("climb")
+])
 
-type SpeedType = { canHover?: boolean } & {
-    [spd in Speed]?: qSpeed
-}
-
-export type ItemEntry = {
-    type: "item"
-    style?: string
-    name: string,
-    entries?: string[]
-    entry?: string
-}
-
-export type ListEntry = {
-    type: "list"
-    style?: string
-    items: ItemEntry[] | string[] // (ItemEntry | string)[]
-}
-
-export type ExtText = {
-    name: string,
-    entries: (string | ListEntry)[]
-}
-
-export type SpellcastingSlots = {
-    name: string
-    headerEntries?: string[]
-    footerEntries?: string[]
-    hidden?: string[]
-    ability: Stat
-    will?: string[]
-    spells: Spells //{ [level in SpellLevel]?: { slots?: number, spells: string[] } }
-}
-
-type Spells = {
-    [level in SpellLevel]?: { slots?: number, spells: string[] }
-} //& { [c in Cantrip]?: { spells: string[] } }
-
-type PerDayEach = '1e' | '2e' | '3e';
-type PerDayTot = '1' | '2' | '3';
-
-type PerDay = PerDayEach | PerDayTot;
-
-
-
-export type SpellcastingDaily = {
-    name: string
-    headerEntries?: string[]
-    footerEntries?: string[]
-    will?: string[]
-    daily?: { [perDay in PerDay]?: string[] }
-    ability: Stat
-}
-
-export type Spellcasting = SpellcastingDaily | SpellcastingSlots
-
-type Tag = string
-
-type Resistances = { resist: string[], note: string, cond: boolean, preNote?: string }
-type Immunities = { immune: string[], note: string, cond: boolean, preNote?: string }
-type Vulnerabilities = { vulnerable: string[], note: string, cond: boolean, preNote?: string }
-
-export type Creature = {
-    name: string,
-    group?: string,
-    source: string,
-    page: number,
-    otherSources?: { source: string }[],
-    size: Size,
-    type: string | { type: string, tags?: string[], swarmSize?: Size },
-    alignment: (string | { alignment: string[], chance: number })[],
-    ac: (number | { ac: number, from?: string[], condition?: string, [other: string]: any })[],
-    hp: { average: number, formula: string },
-    speed: SpeedType,
-    str: number,
-    dex: number,
-    con: number,
-    int: number,
-    wis: number,
-    cha: number,
-    passive: number,
-    cr: string | { cr: string, [cond: string]: string },
-
-    srd?: boolean, //Is this creature part of the SRD
-
-    save?: { [type in Stat]?: string },
-    skill?: { [type in Skill]?: string },
-    senses?: string[],
-    resist?: (DamageType | { special: string } | Resistances)[],
-    immune?: (DamageType | { special: string } | Immunities)[],
-    vulnerable?: (DamageType | { special: string } | Vulnerabilities)[],
-    conditionImmune?: Conditions[]
-    languages?: string[],
-    spellcasting?: Spellcasting[],
-    trait?: ExtText[],
-    action?: ExtText[],
-    legendary?: ExtText[],
-    mythic?: ExtText[],
-
-    senseTags?: Tag[],
-    actionTags?: Tag[],
-    languageTags?: Tag[],
-    damageTags?: Tag[],
-    miscTags?: Tag[],
-
-    [otherKey: string]: any
-}
-
-type SpellRangeBasic = {
-    type: "point" | "radius" | "sphere" | "cone" | "line" | "hemisphere" | "cube"
-    distance: SpellDistance
-}
-type SpellRange = SpellRangeBasic | { type: "special" }
-type SpellDistance = {
-    type: "feet" | "self" | "touch" | "miles" | "sight" | "unlimited" | "plane"
-    amount?: number
-}
-
-type SpellCastingTimeBasic = {
-    number: number
-    unit: DurationType
-}
-type SpellCastingTimeReaction = SpellCastingTimeBasic & { unit: "reaction", condition: string }
-type SpellCastingTime = SpellCastingTimeBasic | SpellCastingTimeReaction
-type SpellDurationTime = {
-    amount: number
-    type: DurationType
-    upTo?: boolean
-}
-type SpellDuration = {
-    type: "timed" | "instant" | "permanent" | "special"
-    ends?: ("dispel" | "trigger" | "discharge")[]
-    duration?: SpellDurationTime
-    concentration?: boolean
-}
-type Source = { name: string, source: string, subSubclass?: string, baseName?: string, baseSource?: string, definedInSource?: string }
-
-
-type MaterialComponent = string | boolean | { // >.< I don't like that 'boolean' is an option here
-    text: string
-    cost?: number
-    consume?: boolean | "optional"
-}
-
-type EntryHeading = {
-    type: 'entries', name: string, entries: Entry[]
-}
-type EntryTable = {
-    type: "table"
-    caption?: string
-    colLabels: string[]
-    colStyles?: string[]
-    rows: (string | EntryTableCell)[][]
-}
-type EntryTableCell = {
-    type: "cell"
-    roll?: { exact?: number, min?: number, max?: number, pad?: boolean }
-}
-type EntryList = {
-    type: "list"
-    items: string[]
-}
-type Entry = string | EntryHeading | EntryTable | EntryList
-type Spell = {
-    name: string,
-    source: string,
-    page: number,
-    otherSources?: { source: string, page?: number }[]
-    srd?: boolean | string,
-    level: number,
-    school: 'E' | 'D' | 'T' | 'I' | 'C' | 'A' | 'N' | 'V'
-    time: SpellCastingTime[]
-    range: SpellRange
-    components: { v?: boolean, s?: boolean, m?: MaterialComponent }
-    duration: SpellDuration[]
-    entries: Entry[]
-
-    entriesHigherLevel?: { type: "entries", name: string, entries: string[] }[]
-    miscTags?: string[]
-    areaTags?: string[]
-    classes: { fromClassList?: Source[], fromSubclass?: { class: Source, subclass: Source }[], fromClassListVariant?: Source[] }
-    conditionInflict?: Conditions[]
-    conditionImmune?: Conditions[]
-    savingThrow?: LongStat[]
-    damageInflict?: DamageType[]
-    damageResist?: DamageType[]
-    damageVulnerable?: DamageType[]
-    damageImmune?: DamageType[]
-    races?: Source[]
-    backgrounds?: Source[]
-    meta?: { ritual: boolean }
-    eldritchInvocations?: Source[]
-    spellAttack?: ("M" | "R" | "O")[]
-    abilityCheck?: LongStat[]
-    hasFluffImages?: boolean
-    hasFluff?: boolean
-    scalingLevelDice?: { label: string, scaling: { [level: string]: string } } | { label: string, scaling: { [level: string]: string } }[]
-    // [otherKey: string]: any
-}
-
-const proficiencyBonus = {
-    "0": 2, "1/8": 2, "1/4": 2, "1/2": 2,
-    "1": 2, "2": 2, "3": 2, "4": 2,
-    "5": 3, "6": 3, "7": 3, "8": 3,
-    "9": 4, "10": 4, "11": 4, "12": 4,
-    "13": 5, "14": 5, "15": 5, "16": 5,
-    "17": 6, "18": 6, "19": 6, "20": 6,
-    "21": 7, "22": 7, "23": 7, "24": 7,
-    "25": 8, "26": 8, "27": 8, "28": 8,
-    "29": 9, "30": 9
-}
-
-export const parseAction = (entry: string) => {
-    // const re = new RegExp(/\{\@([a-z]+)[\s]*([^\}]+)?\}/, 'g')
-    const re = new RegExp(/\{\@([a-z]+)[\s]*([^\}\|]+)?(?:\|([^\}]+))*\}/, 'g')
-
-    return entry.replaceAll(re, (a, b, c, d) => formatAction(b, c))
-}
-
-type BlockCommand = 'dc' | 'b' | 'i' | 'damage' | 'recharge' | 'book' | 'condition'
-    | 'h' | 'atk' | 'spell' | 'skill' | 'item' | 'creature' | 'chance' | 'hit' | 'dice'
-
-const attackType: { [type: string]: string } = {
-    'mw': 'Melee Weapon Attack',
-    'rw': 'Ranged Weapon Attack',
-    'ms': 'Melee Spell Attack',
-    'rs': 'Ranged Spell Attack'
-}
-export const formatAction = (command: BlockCommand, parameter: string): string => {
-    switch (command) {
-        case "b":
-            return `<b>${parameter}</b>`
-        case "i":
-            return `<i>${parameter}</i>`
-        case "spell":
-        case "condition":
-        case "item":
-            return `<u style="text-decoration-style: dotted;">${parameter}</u>`;
-        case "recharge":
-            return `(Recharge on ${parameter || 6})`
-        case "hit":
-            return `<span class="${command}">${renderModifier(parseInt(parameter))}</span>`
-        case "skill":
-            return `<span class="${command}">${parameter}</span>`
-        case "dc":
-            return `<span class="${command}">DC ${parameter}</span>`
-        case "damage":
-        case "dice":
-            return `${parameter}`
-        case "creature":
-            return `<span class="creature">${parameter}</span>`
-        case "atk":
-            let params = parameter.split(',');
-            return params.map(p => `<i>${attackType[p]}</i> `).join(',')
-        case "chance":
-            return `<span class="chance">${parameter}</span>`
-        case "h":
-            return '';
-        case "book":
-        default:
-            return parameter
-    }
-}
-
-export const renderSize = (c: Creature): string => {
-    return sizes[c.size] || 'unknown';
-};
-
-export const renderType = (c: Creature): string => {
-    console.log(c)
-    if (typeof c.type == 'string') {
-        return c.type;
-    }
-    return c.type.type;
-};
-
-export const renderCR = (c: Creature): string => {
-    return typeof c.cr == 'string' ? c.cr : c.cr.cr;
-};
-
-export const renderHP = (c: Creature): string => {
-    return `${c.hp.average} (${c.hp.formula})`;
-};
-
-export const renderAC = (c: Creature): string => {
-    return c.ac
-        .map((ac) => {
-            if (typeof ac == 'number') return `${ac}`;
-            if (ac?.from) return `${ac.ac} (${ac.from})`;
-            if (ac?.condition) return `${ac.ac} ${ac.condition}`;
-            return `${ac.ac}`;
-        })
-        .join(', ');
-};
-export const renderSaves = (c: Creature): string => {
-    let output: string[] = [];
-    // Object.prototype.map()
-    if (!c.save) return '';
-    let prop: Stat;
-    for (prop in c.save) {
-        if (prop) {
-            output.push(`${capitalise(prop)}: ${c.save[prop]}`);
-        }
-    }
-    return output.join(', ');
-};
-export const renderSkills = (c: Creature): string => {
-    let output: string[] = [];
-    if (!c.skill) return '';
-    let skill: Skill;
-    for (skill in c.skill) {
-        if (skill) {
-            output.push(`${capitalise(skill)}: ${c.skill[skill]}`);
-        }
-    }
-    return output.join(', ');
-};
-export const renderSpeed = (c: Creature): string => {
-    let output: string[] = [];
-    // if (!c.speed) return '';
-    let i;
-    for (i in speeds) {
-        let eachSpeed = speeds[i];
-        // if (!(eachSpeed in c.speed)) continue;
-        let cond: string = '';
-        let val: qSpeed | undefined = c.speed[eachSpeed];
-        let dispval: number = 0;
-        if (!val) continue;
-        if (typeof val === 'number') {
-            dispval = val;
-        } else if (val) {
-            cond = val.condition;
-            dispval = val.number;
-        }
-        // let canHover = (eachSpeed == 'fly' && c.speed?.canHover) ? ' (hover)' : '';
-        // output.push(`${eachSpeed} ${val} ft.${cond}${canHover}`);
-        output.push(`${eachSpeed} ${dispval} ft.${cond}`);
-    }
-    return output.join(', ');
-};
-
-export const renderSenses = (c: Creature): string => {
-    let passive: string = `Passive perception ${c.passive}, `;
-    return passive.concat(c.senses?.join(', ') || '');
-};
-export const renderLanguages = (c: Creature): string => {
-    return c.languages?.join(', ') || '';
-};
-export const renderResistances = (c: Creature): string => {
-    return (
-        c.resist
-            ?.map((r) => {
-                if (typeof r == 'string') return r;
-                if ('special' in r) return r.special;
-                return (
-                    (r?.preNote ? `${r.preNote} ` : '') + r.resist.join(', ') + (r.note ? ` ${r.note}` : '')
-                );
-            })
-            .join('; ') || ''
-    );
-};
-export const renderImmunities = (c: Creature): string => {
-    return (
-        c.immune
-            ?.map((r) => {
-                if (typeof r == 'string') return r;
-                if ('special' in r) return r.special;
-                return (r?.preNote || '') + r.immune.join(', ') + (r.note ? `(${r.note})` : '');
-            })
-            .join('; ') || ''
-    );
-};
-export const renderVulnerabilities = (c: Creature): string => {
-    return (
-        c.vulnerable
-            ?.map((r) => {
-                if (typeof r == 'string') return r;
-                if ('special' in r) return r.special;
-                return (r?.preNote || '') + r.vulnerable.join(', ') + (r.note ? `(${r.note})` : '');
-            })
-            .join('; ') || ''
-    );
-};
-export const renderConditionImmunities = (c: Creature): string => {
-    return c.conditionImmune?.join(', ') || '';
-};
-
-export const renderBlock = (
-    c: Creature,
-    blockfunction: (c: Creature, p: Participant | undefined) => string,
-    wrapfunction: (s: string) => string,
-    participant: Participant | undefined = undefined
-): string => {
-    let output: string = parseAction(blockfunction(c, participant));
-    if (!output) return '';
-    return wrapfunction(output);
-};
-export const makeBlock = (heading: string) => {
-    return (content: string) =>
-        `<hr /><div class="block ${heading.toLowerCase()}"><h5>${heading}</h5>${content}</div>`;
-};
-export const makeMiniBlock = (heading: string) => {
-    return (content: string) => ` <span><b>${heading}:</b> ${content}</span>`;
-};
-export const makeArray = (label: string) => {
-    return (content: string) =>
-        `<div class="heading ${label.toLowerCase()}">${label}</div><div class="content ${label.toLowerCase()}">${content}</div>`;
-};
-
-/**
- * 
- * @param e The entity in question
- * @returns boolean, whether the entity has metadata associated with it
- */
-export const entityHasData = (e: Entity) => {
-    // console.log(JSON.stringify(e.data));
-    return JSON.stringify(e.data).length > 10;
-};
-
-/**
- * 
- * @param p A participant in question
- * @param entities The list of entities available in this combat
- * @returns boolean - whether the participant in question both has a matching entity, and that entity has metadata associated with it
- */
-export const participantHasEntityData = (p: Participant, entities: Entity[]): boolean => {
-    if (!p.entity_id) return false;
-    if (!entities) return false;
-    // console.log(entities);
-    return !!entities.find((e) => {
-        return e.entity_id === p.entity_id && entityHasData(e);
-    });
-};
-
-/**
- * Parses the 'name' field of an action/trait etc and returns the cost, i.e.:
- * Furious Bite (Costs 2 actions) -> 2
- * @param name the name of the trait
- * @returns the cost associated, or undefined
- */
-export const findCost = (name: string): number | undefined => {
-    const re = new RegExp(/costs (\d+) actions/, 'i');
-    let match = name.match(re);
-    if (!match || match.length != 2) return undefined;
-    return parseInt(match[1]);
-};
-
-export const findNumberOfLegendaryResistances = (name: string): number | undefined => {
-    const re = new RegExp(/legendary resistance \((\d+)\/day\)/, 'i');
-    let match = name.match(re);
-    if (!match || match.length != 2) return undefined;
-    return parseInt(match[1]);
-};
-/**
- * Parse the name field of an action/trait etc and return the 'id' if there is such a thing
- * @param name 
- */
-export const parseNameForConsumable = (name: string): { id: string, qty: number, recharge: string } | undefined => {
-    name = name.toLocaleLowerCase()
-    if (name.includes('legendary resistance')) return { id: 'legendary-resistance', qty: findNumberOfLegendaryResistances(name) || 3, recharge: 'day' }
-    if (name.includes('recharge')) {
-        return { id: name.split("(")[0].split("{")[0].trim().replace(' ', '-'), qty: 1, recharge: 'manual' }
-    }
-    if (name.includes('/day')) {
-        return { id: name.split("(")[0].trim(), qty: parseInt(name.split("(")[1].split("/")[0]), recharge: 'day' }
-    }
-    return undefined
-}
-const parseListForConsumable = (p: Participant) => {
-    return (action: ExtText) => {
-        let result = parseNameForConsumable(action.name)
-        if (result) {
-            let { id, qty, recharge } = result;
-            console.log(`${id} - ${p.participant_id}`)
-            createCounter(p, id, action.name, qty, 0, recharge)
-        }
-    }
-}
-
-export const spellNameToID = (spell: string) => {
-    let t = spell.split("}")[0].split(" ").slice(1)
-    return { spellID: t.join("-").toLocaleLowerCase(), spellName: t.join(" ") }
-}
-
-// type stemA = 'legendary-actions' | 'legendary-resistance' | 'spell-slot' | 'spell-day';
-// type stemB = Exclude<SpellLevel,'0'> | '1e' | '2e' | '3e';
-// type stemC = string;
-
-type IDStem =
-    ['legendary-actions'] |
-    ['legendary-resistance'] |
-    ['spell-slot', Exclude<SpellLevel, '0'>] |
-    ['spell-day', PerDayTot] |
-    ['spell-day', PerDayEach, string]
-
-// {a: 'legendary-action', b: undefined, c: undefined} | 
-//             {a: 'legendary-resistance', b: undefined, c: undefined} | 
-//             {a: 'spell-slot', b: Exclude<SpellLevel,'0'>, c: undefined} | 
-//             {a: 'spell-day', b: '1'|'2'|'3', c: undefined} | 
-//             {a: 'spell-day', b: '1e' | '2e' | '3e', c: string}
-
-export const createIDStem = ([a, b, c]: IDStem): string => {
-    return [a, b, c].filter(a => a).join('-')
-}
-
-/**
- * Creates counters as required for each participant without having to render the entire statblock. 
- * @param participants A list of participants, say, from a combat object
- * @param entities The list of entities corresponding to this list of participants. 
- */
-export const parseAndCreateCounters = (participants: Participant[], entities: Entity[]) => {
-    participants.filter(p => participantHasEntityData(p, entities)).forEach(participant => {
-        // legendary actions
-        let entity: Entity | undefined = entities.find(e => e.entity_id == participant.entity_id);
-        if (!entity || !entityHasData(entity)) return;
-        let data: Creature = entity.data as unknown as Creature;
-        if (data?.legendary) {
-            console.log(`${participant.participant_id}-legendary-actions`)
-            createCounter(participant, createIDStem(['legendary-actions']), 'Legendary Actions', 3, 0, 'turn')
-        }
-        // if (data?.trait && data.trait.find(t => t.name.includes('Legendary Resistance'))) {
-        //     let trait = data.trait.find(t => t.name.includes('Legendary Resistance'));
-        //     if (trait) {
-        //         console.log(`${participant.participant_id}-legendary-resistances`)
-        //         createCounter(participant, 'legendary-resistance', 'Legendary Resistance', findNumberOfLegendaryResistances(trait.name) || 3, 0, 'day')
-        //     }
-        // }
-        if (data?.trait) {
-            data.trait.forEach(parseListForConsumable(participant))
-        }
-        if (data?.action) {
-            data.action.forEach(parseListForConsumable(participant))
-        }
-        if (data?.spellcasting && data.spellcasting) {
-            data.spellcasting.forEach(spellcasting => {
-                if ('spells' in spellcasting) {
-                    Object.entries(spellcasting.spells).forEach(([level, spell]) => {
-                        if (spell && spell.slots) {
-                            // console.log(`${participant.participant_id}-spell-${level}`)
-                            createCounter(participant, createIDStem(['spell-slot', level as Exclude<SpellLevel, '0'>]), `Level ${level} spells`, spell.slots || 0, 0, 'day')
-                        }
-                    })
-                } else if ('daily' in spellcasting) {
-                    if (spellcasting.daily)
-                        Object.entries(spellcasting.daily).forEach((item) => {
-                            let [numPerDay, spells] = item as [PerDay, string[]];
-                            let num = parseInt(numPerDay);
-                            // console.log(`${participant.participant_id}-spell-day-${numPerDay}`)
-                            if (numPerDay.includes('e')) {
-                                spells.forEach(spell => {
-                                    let { spellName, spellID } = spellNameToID(spell);
-                                    numPerDay = numPerDay as PerDayEach
-                                    createCounter(participant, createIDStem(['spell-day', numPerDay, spellID]), spellName, parseInt(numPerDay), 0, 'day')
-                                })
-                            } else {
-                                numPerDay = numPerDay as PerDayTot
-                                createCounter(participant, createIDStem(['spell-day', numPerDay]), numPerDay, parseInt(numPerDay), 0, 'day')
-                            }
-                        })
-                }
-            })
-        }
+export const qSpeedSchema = z.union([
+    z.number(),
+    z.object({
+        number: z.number(),
+        condition: z.string()
     })
-}
+])
 
-const creatures: Creature[] = [
+const speedTypeSchema = z.union([
+    z.object({ canHover: z.boolean().optional() }),
+    z.record(speedSchema, qSpeedSchema).optional()]
+);
+// .object({
+//     canHover: z.boolean().optional()
+// })
+// .and(z.record(speedSchema, qSpeedSchema).optional())
+
+export const itemEntrySchema = z.object({
+    type: z.literal("item"),
+    style: z.string().optional(),
+    name: z.string(),
+    entries: z.array(z.string()).optional(),
+    entry: z.string().optional()
+})
+
+export const listEntrySchema = z.object({
+    type: z.literal("list"),
+    style: z.string().optional(),
+    items: z.union([z.array(itemEntrySchema), z.array(z.string())])
+})
+
+export const extTextSchema = z.object({
+    name: z.string(),
+    entries: z.array(z.union([z.string(), listEntrySchema]))
+})
+
+const spellSlotSchema = z.object({
+    slots: z.number().optional(),
+    spells: z.array(z.string())
+})
+
+const spellsSchema = z.record(spellLevelSchema, spellSlotSchema)
+
+const perDayEachSchema = z.union([
+    z.literal("1e"),
+    z.literal("2e"),
+    z.literal("3e")
+])
+
+const perDayTotSchema = z.union([
+    z.literal("1"),
+    z.literal("2"),
+    z.literal("3")
+])
+
+const perDaySchema = z.union([perDayEachSchema, perDayTotSchema])
+
+export const spellcastingDailySchema = z.object({
+    name: z.string(),
+    headerEntries: z.array(z.string()).optional(),
+    footerEntries: z.array(z.string()).optional(),
+    will: z.array(z.string()).optional(),
+    daily: z.record(perDaySchema, z.array(z.string())).optional(),
+    ability: statSchema
+})
+
+const tagSchema = z.string()
+
+const resistancesSchema = z.object({
+    resist: z.array(z.string()),
+    note: z.string(),
+    cond: z.boolean(),
+    preNote: z.string().optional()
+})
+
+const immunitiesSchema = z.object({
+    immune: z.array(z.string()),
+    note: z.string(),
+    cond: z.boolean(),
+    preNote: z.string().optional()
+})
+
+const vulnerabilitiesSchema = z.object({
+    vulnerable: z.array(z.string()),
+    note: z.string(),
+    cond: z.boolean(),
+    preNote: z.string().optional()
+})
+
+export const spellcastingSlotsSchema = z.object({
+    name: z.string(),
+    headerEntries: z.array(z.string()).optional(),
+    footerEntries: z.array(z.string()).optional(),
+    hidden: z.array(z.string()).optional(),
+    ability: statSchema,
+    will: z.array(z.string()).optional(),
+    spells: spellsSchema
+})
+
+export const spellcastingSchema = z.union([
+    spellcastingDailySchema,
+    spellcastingSlotsSchema
+])
+
+export const creatureSchema = z.record(z.string(), z.any()).and(
+    z.object({
+        name: z.string(),
+        group: z.string().optional(),
+        source: z.string(),
+        page: z.number(),
+        otherSources: z
+            .array(
+                z.object({
+                    source: z.string()
+                })
+            )
+            .optional(),
+        size: sizeSchema,
+        type: z.union([
+            z.string(),
+            z.object({
+                type: z.string(),
+                tags: z.array(z.string()).optional(),
+                swarmSize: sizeSchema.optional()
+            })
+        ]),
+        alignment: z.array(
+            z.union([
+                z.string(),
+                z.object({
+                    alignment: z.array(z.string()),
+                    chance: z.number()
+                })
+            ])
+        ),
+        ac: z.array(
+            z.union([
+                z.number(),
+                z.record(z.any()).and(
+                    z.object({
+                        ac: z.number(),
+                        from: z.array(z.string()).optional(),
+                        condition: z.string().optional()
+                    })
+                )
+            ])
+        ),
+        hp: z.object({
+            average: z.number(),
+            formula: z.string()
+        }),
+        speed: speedTypeSchema,
+        str: z.number(),
+        dex: z.number(),
+        con: z.number(),
+        int: z.number(),
+        wis: z.number(),
+        cha: z.number(),
+        passive: z.number(),
+        cr: z.union([
+            z.string(),
+            z.record(z.string()).and(
+                z.object({
+                    cr: z.string()
+                })
+            )
+        ]),
+        srd: z.boolean().optional(),
+        save: z.record(statSchema, z.string()).optional(),
+        skill: z.record(skillSchema, z.string()).optional(),
+        senses: z.array(z.string()).optional(),
+        resist: z
+            .array(
+                z.union([
+                    damageTypeSchema,
+                    z.object({
+                        special: z.string()
+                    }),
+                    resistancesSchema
+                ])
+            )
+            .optional(),
+        immune: z
+            .array(
+                z.union([
+                    damageTypeSchema,
+                    z.object({
+                        special: z.string()
+                    }),
+                    immunitiesSchema
+                ])
+            )
+            .optional(),
+        vulnerable: z
+            .array(
+                z.union([
+                    damageTypeSchema,
+                    z.object({
+                        special: z.string()
+                    }),
+                    vulnerabilitiesSchema
+                ])
+            )
+            .optional(),
+        conditionImmune: z.array(conditionsSchema).optional(),
+        languages: z.array(z.string()).optional(),
+        spellcasting: z.array(spellcastingSchema).optional(),
+        trait: z.array(extTextSchema).optional(),
+        action: z.array(extTextSchema).optional(),
+        legendary: z.array(extTextSchema).optional(),
+        mythic: z.array(extTextSchema).optional(),
+        senseTags: z.array(tagSchema).optional(),
+        actionTags: z.array(tagSchema).optional(),
+        languageTags: z.array(tagSchema).optional(),
+        damageTags: z.array(tagSchema).optional(),
+        miscTags: z.array(tagSchema).optional()
+    })
+)
+
+export const creaturesSchema = z.array(creatureSchema);
+
+type Creature = z.infer<typeof creatureSchema>;
+export const creatures: Creature[] = [
     {
         "name": "Aarakocra",
         "source": "MM",
@@ -65480,3 +65226,4 @@ const creatures: Creature[] = [
         "hasFluffImages": true
     }
 ]
+

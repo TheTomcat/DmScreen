@@ -38,7 +38,6 @@
 
 	let renderData: Creature;
 	$: {
-		console.log('onchange');
 		if (entity) {
 			renderData = entity.data as unknown as Creature;
 			participant = { participant_id: entity.entity_id, combat_id: 1 } as Participant;

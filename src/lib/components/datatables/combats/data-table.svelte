@@ -1,46 +1,48 @@
 <script lang="ts">
 	import { createTable, Render, Subscribe, createRender } from 'svelte-headless-table';
-	import ImageTag from '$lib/components/ImageTag.svelte';
 	import * as Table from '$lib/components/ui/table';
 	import { get, writable, type Writable } from 'svelte/store';
 	import {
 		addPagination,
 		addTableFilter,
 		addSelectedRows,
-		addColumnFilters
+		addColumnFilters,
+		addHiddenColumns,
+		addSortBy
 	} from 'svelte-headless-table/plugins';
 
 	import client from '$lib/api/index';
-	import type {
-		Collection,
-		Combat,
-		Image,
-		ImageType,
-		ImageURL,
-		Participant,
-		Tag
-	} from '../../../../app';
+	import type { Combat, Participant } from '../../../../app';
 	import { capitalise } from '$lib';
-	import { SvelteComponent, onMount } from 'svelte';
+	import { createEventDispatcher, onMount } from 'svelte';
 	// import DataTableTagList from './data-table-tag-list.svelte';
 
 	// import data from './data.json';
 	import * as DataTable from '$lib/components/ui/datatable';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { browser } from '$app/environment';
-	import ImageTypeSelectBox from '$lib/components/ImageTypeSelectBox.svelte';
-	import DataTableToolbar from './data-table-toolbar.svelte';
+	import DataTableToolbar from '$lib/components/datatables/combats/data-table-toolbar.svelte';
+	import DataTableLoadCombat from './data-table-load-combat.svelte';
 	// import DataTableLink from './data-table-entity-link.svelte';
 	// import DataTableToolbar from './data-table-toolbar.svelte';
 
 	// import type { imageTypes } from './data';
 	import CollectionSelectionBox from '$lib/components/new/CollectionSelectionBox.svelte';
 	import { toast } from 'svelte-sonner';
+	import type { wsController } from '$lib/ws';
 	// type imageType = (typeof imageTypes)[number]['value'];
 
 	// let data: ImageURL[] = [];
+
+	export let ws: wsController | undefined = undefined;
+
 	const dataStore = writable<Combat[]>([]);
 	const totalCount = writable<number>(1);
+
+	const dispatch = createEventDispatcher<{
+		newCombat: { combat: Combat };
+		runCombat: { combat: Combat };
+	}>();
 
 	const selection = DataTable.createSelection();
 	const { selectedDataIDs: selectedImageIDs } = selection;
@@ -49,14 +51,24 @@
 		page: number = 0,
 		perPage: number = 20,
 		q: string,
-		numParticipants: number,
 		combat_participants_name: string
+		// num_participants: [number | undefined, number | undefined]
 	) => {
 		// console.log('Getting ', { name: entityFilter, page, is_PC: showPCs });
 		return client
 			.GET('/combat/', {
 				params: {
-					query: { page: page + 1, size: perPage, title: q, combat_participants_name }
+					query: {
+						page: page + 1,
+						size: perPage,
+						title: q,
+						combat_participants_name,
+						//@ts-ignore
+						sort_by: $sortKeys[0].id,
+						sort_dir: $sortKeys[0].order
+						// combat_participants_at_least: num_participants[0],
+						// combat_participants_at_most: num_participants[1]
+					}
 				}
 			})
 			.then((response) => {
@@ -75,12 +87,21 @@
 		}),
 		filter: addTableFilter({
 			serverSide: true,
+			includeHiddenColumns: true,
 			fn: ({ filterValue, value }) => {
 				return value.toLocaleLowerCase().includes(filterValue.toLocaleLowerCase());
 			}
 		}),
 		select: addSelectedRows({}),
-		colFilter: addColumnFilters({ serverSide: true })
+		colFilter: addColumnFilters({ serverSide: true }),
+		hidden: addHiddenColumns({
+			initialHiddenColumnIds: ['numParticipants']
+		}),
+		sort: addSortBy({
+			serverSide: true,
+			disableMultiSort: true,
+			initialSortKeys: [{ id: 'title', order: 'asc' }]
+		})
 	});
 
 	const columns = table.createColumns([
@@ -90,9 +111,6 @@
 				const { allPageRowsSelected } = pluginStates.select;
 				return createRender(DataTable.Checkbox, {
 					selection,
-					// checked: get(allPageRowsSelected),
-					// oncheck: () => {},
-					// onuncheck: selection.clear,
 					id: undefined
 				});
 			},
@@ -102,9 +120,6 @@
 
 				return createRender(DataTable.Checkbox, {
 					selection,
-					// checked: get(selectedImageIDs).includes(value),
-					// oncheck: selection.addID,
-					// onuncheck: selection.removeID,
 					id: value
 				});
 			},
@@ -117,6 +132,26 @@
 		table.column({
 			accessor: ({ participants }) => participants,
 			header: 'Num Participants',
+			id: 'numParticipants',
+
+			plugins: {
+				colFilter: {
+					fn: ({ filterValue, value }) => {
+						console.log(filterValue, value);
+						return true;
+					},
+					initialFilterValue: [1, 20],
+					render: ({ filterValue }) => {
+						console.log(get(filterValue));
+						return get(filterValue);
+					}
+				}
+			}
+		}),
+
+		table.column({
+			accessor: ({ participants }) => participants,
+			header: 'Num Participants',
 			id: 'participantNames',
 			cell: ({ value }) => {
 				return render_participants(value);
@@ -125,11 +160,6 @@
 				colFilter: {
 					fn: ({ filterValue, value }) => {
 						console.log(filterValue, value);
-						/*if (filterValue.length === 0) return true;
-						if (!Array.isArray(filterValue) || typeof value !== 'string') return true;
-						return filterValue.some((filter) => {
-							return value.includes(filter);
-						});*/
 						return true;
 					},
 					initialFilterValue: [],
@@ -143,6 +173,22 @@
 		table.column({
 			accessor: 'title',
 			header: 'Title'
+		}),
+		table.column({
+			id: 'selectCombat',
+			accessor: (combat) => combat,
+			header: 'Load Combat',
+			cell: ({ row, value }, { pluginStates }) => {
+				const { getRowState } = pluginStates.select;
+				const { isSelected } = getRowState(row);
+
+				return createRender(DataTableLoadCombat, {
+					combat: value,
+					ws: ws
+				}).on('runCombat', (e: CustomEvent<{ combat: Combat }>) => {
+					dispatch('runCombat', { combat: e.detail.combat });
+				});
+			}
 		})
 	]);
 
@@ -157,33 +203,57 @@
 	}: {
 		filterValues: Writable<{
 			participantNames: string[];
+			numParticipants: [number | undefined, number | undefined];
 		}>;
 	} = pluginStates.colFilter;
 
 	const { selectedDataIds } = pluginStates.select;
 
+	const { hiddenColumnIds } = pluginStates.hidden;
+
+	const { sortKeys } = pluginStates.sort;
+
 	$: {
-		if (browser && $filterValues && $filterValues.participantNames !== undefined) {
+		if (
+			browser &&
+			$filterValues &&
+			$filterValues.participantNames !== undefined
+			// $filterValues.numParticipants !== undefined
+		) {
 			// console.log($pageIndex, $pageSize);
-			getCombats($pageIndex, $pageSize, $filterValue, 0, $filterValues.participantNames.join('|'));
+			getCombats(
+				$pageIndex,
+				$pageSize,
+				$filterValue,
+				$filterValues.participantNames.join('|')
+				// $filterValues.numParticipants
+			);
 		}
 	}
 
 	const render_participants = (p: Participant[]): string => {
 		return `${p.length}: ${p.filter((p) => p.is_PC).length}+${p.filter((p) => !p.is_PC).length}`;
 	};
+
+	const newCombat = (e: CustomEvent<{ combat: Combat }>) => {
+		dispatch('newCombat', { combat: e.detail.combat });
+		$filterValue = ' ';
+		$filterValue = '';
+	};
+
+	$: {
+		if (!ws) {
+			$hiddenColumnIds = [...$hiddenColumnIds, 'selectCombat'];
+		} else {
+			$hiddenColumnIds = $hiddenColumnIds.filter((s) => s !== 'selectCombat');
+		}
+	}
 </script>
 
+{JSON.stringify($sortKeys)}
 <div class="space-y-4">
-	<DataTableToolbar {tableModel} selection={selection.selectedDataIDs} />
-	<!-- <div class="flex items-center py-4">
-		<Input
-			class="max-w-sm"
-			placeholder="Filter image names"
-			type="text"
-			bind:value={$filterValue}
-		/>
-	</div> -->
+	<DataTableToolbar {tableModel} selection={selection.selectedDataIDs} on:newCombat={newCombat} />
+
 	<div class="rounded-md border">
 		<Table.Root {...$tableAttrs}>
 			<Table.Header>

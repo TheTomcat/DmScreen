@@ -25,7 +25,7 @@
 	type ImageType = components['schemas']['ImageType'];
 	import { flip } from 'svelte/animate';
 	import { favouriteStore } from '$lib/stores/favouriteStore';
-	import DataTable from '../../routes/(main)/library/images/data-table.svelte';
+	import DataTable from '$lib/components/datatables/images/data-table.svelte';
 	import CollectionSelectionBox from './new/CollectionSelectionBox.svelte';
 
 	export let selectSingleImage: boolean = false;

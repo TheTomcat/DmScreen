@@ -7,6 +7,10 @@
 	import client from '$lib/api/index';
 
 	export let image_id: number | undefined | null;
+
+	export let show_null_image: boolean = true;
+	export let link_to_image: boolean = true;
+
 	let image: ImageURL | undefined;
 
 	const getImage = () => {
@@ -21,13 +25,13 @@
 	{#if image_id}
 		<Popover.Root>
 			<Popover.Trigger asChild let:builder>
-				<Button on:click={getImage} builders={[builder]} variant="ghost">
-					<Image />
+				<Button on:click={getImage} builders={[builder]} variant="ghost" class="h-[unset] py-0">
+					<Image class="h-4 w-4" />
 				</Button>
 			</Popover.Trigger>
 			<PopoverContent>
-				{#if image}
-					<Button href="/manager?image={image_id}" variant="ghost" class="h-[unset]">
+				{#if image && link_to_image}
+					<Button href="/manager?image={image_id}" variant="ghost">
 						<img
 							class="portrait"
 							src={`/api/${image.thumbnail_url}?width=200`}
@@ -36,10 +40,18 @@
 							height={image.dimension_y}
 						/>
 					</Button>
+				{:else if image && !link_to_image}
+					<img
+						class="portrait"
+						src={`/api/${image.thumbnail_url}?width=200`}
+						alt={image.name}
+						width={image.dimension_x}
+						height={image.dimension_y}
+					/>
 				{/if}
 			</PopoverContent>
 		</Popover.Root>
-	{:else}
-		<ImageOff />
+	{:else if show_null_image}
+		<ImageOff class="h-4 w-4" />
 	{/if}
 </div>

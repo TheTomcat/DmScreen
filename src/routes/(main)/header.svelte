@@ -119,6 +119,11 @@
 							<span>Entities</span>
 							<!-- <DropdownMenu.Shortcut>⌘S</DropdownMenu.Shortcut> -->
 						</DropdownMenu.Item>
+						<DropdownMenu.Item href="/library/combats">
+							<Swords class="mr-2 h-4 w-4" />
+							<span>Combats</span>
+							<!-- <DropdownMenu.Shortcut>⌘S</DropdownMenu.Shortcut> -->
+						</DropdownMenu.Item>
 						<DropdownMenu.Item disabled={true}>
 							<Link class="mr-2 h-4 w-4" />
 							<span>Attributions</span>

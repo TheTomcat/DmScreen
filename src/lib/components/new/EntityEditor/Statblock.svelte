@@ -34,51 +34,53 @@
 	import Spellcasting from './Spellcasting.svelte';
 	import Actions from './Actions.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import * as Card from '$lib/components/ui/card';
+	import * as Select from '$lib/components/ui/select';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
 	import { Button } from '$lib/components/ui/button';
 	import TextBlock from './TextBlock.svelte';
 	import client from '$lib/api/index';
+	import SkillDialog from './SkillDialog.svelte';
 
 	export let entity: Entity;
 	export let participant: Participant | undefined = undefined; //= { participant_id: 1, combat_id: 1 } as Participant;
 	export let dialogOpen: boolean = false;
 
-	let image: ImageURL | undefined;
-	const getImage = (image_id: number) => {
-		client.GET('/image/{image_id}', { params: { path: { image_id } } }).then((response) => {
-			if (!response || !response.data) return;
-			image = response.data;
-		});
-	};
+	// let image: ImageURL | undefined;
+	// const getImage = (image_id: number) => {
+	// 	client.GET('/image/{image_id}', { params: { path: { image_id } } }).then((response) => {
+	// 		if (!response || !response.data) return;
+	// 		image = response.data;
+	// 	});
+	// };
 
 	let renderData: Creature;
 	$: {
 		if (entity) {
-			renderData = entity.data as unknown as Creature;
-			if (entity.image_id) {
-				getImage(entity.image_id);
-			} else {
-				image = undefined;
-			}
+			renderData = JSON.parse(entity.data as string) as unknown as Creature;
 		}
 	}
 </script>
 
-<Dialog.Root bind:open={dialogOpen}>
-	<Dialog.Trigger><slot /></Dialog.Trigger>
-	<Dialog.Content class="sm:max-w-[90%] overflow-scroll h-3/4 mx-6">
-		<Dialog.Header>
-			<Dialog.Title>
-				{#if entity}{entity.name}{:else}No Entity Found{/if}
-			</Dialog.Title>
-			<Dialog.Description>
-				{#if entity}
-					{renderSize(renderData)}
-					{renderType(renderData)}
-				{:else}
-					No Entity Found
-				{/if}
-			</Dialog.Description>
-		</Dialog.Header>
+<Card.Root class="w-full">
+	<Card.Header>
+		<Card.Title
+			>{#if entity}{entity.name}{:else}No Entity Found{/if}</Card.Title
+		>
+		<Card.Description
+			>{#if entity}
+				{renderSize(renderData)}
+				{renderType(renderData)}
+			{:else}
+				No Entity Found
+			{/if}</Card.Description
+		>
+	</Card.Header>
+	<Card.Content>
+		{#if renderData && renderData.skill}
+			<SkillDialog skills={renderData.skill} />
+		{/if}
 		{#if !entity || !renderData}
 			No entity found
 		{:else}
@@ -102,7 +104,7 @@
 						<div class="heading languages">Languages</div>
 						<div class="content languages">{renderLanguages(renderData)}</div>
 					</div>
-					<div class="object-cover max-h-[200px] flex justify-end">
+					<!-- <div class="object-cover max-h-[200px] flex justify-end">
 						{#if image}
 							<img
 								class="portrait object-scale-down"
@@ -110,7 +112,7 @@
 								alt={image.name}
 							/>
 						{/if}
-					</div>
+					</div> -->
 				</div>
 				<hr />
 				<div class="flex flex-row gap-3 justify-center my-3">
@@ -175,21 +177,21 @@
 					<div class="flex flex-col my-3">
 						<hr />
 						<h2 class="text-xl font-bold">Traits</h2>
-						<Actions actions={renderData.trait} {participant} />
+						<Actions actions={renderData.trait} />
 					</div>
 				{/if}
 				{#if renderData.spellcasting}
 					<div class="flex flex-col my-3">
 						<hr />
 						<h2 class="text-xl font-bold">Spellcasting</h2>
-						<Spellcasting spellcastings={renderData.spellcasting} {participant} />
+						<Spellcasting spellcastings={renderData.spellcasting} />
 					</div>
 				{/if}
 				{#if renderData.action}
 					<div class="flex flex-col my-3">
 						<hr />
 						<h2 class="text-xl font-bold">Actions</h2>
-						<Actions actions={renderData.action} {participant} />
+						<Actions actions={renderData.action} />
 					</div>
 				{/if}
 				{#if renderData.legendary}
@@ -214,7 +216,7 @@
 								Legendary Actions (3/Round)
 							{/if}
 						</h2>
-						<Actions actions={renderData.legendary} {participant} legendary={true} />
+						<Actions actions={renderData.legendary} />
 					</div>
 				{/if}
 				{#if renderData.mythic}
@@ -244,13 +246,17 @@
 								<p>{str}</p>
 							{/each}
 						{/if}
-						<Actions actions={renderData.mythic} {participant} legendary={true} />
+						<Actions actions={renderData.mythic} />
 					</div>
 				{/if}
 			</div>
 		{/if}
-	</Dialog.Content>
-</Dialog.Root>
+	</Card.Content>
+	<Card.Footer class="flex justify-between">
+		<Button variant="outline">Cancel</Button>
+		<Button>Deploy</Button>
+	</Card.Footer>
+</Card.Root>
 
 <style>
 	hr {

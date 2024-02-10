@@ -83,6 +83,7 @@
 	import ScrollBox from '$lib/components/ScrollBox.svelte';
 	import * as Popover from '$lib/components/ui/popover';
 	import { Switch } from '$lib/components/ui/switch';
+	import DataTable from '$lib/components/datatables/combats/data-table.svelte';
 
 	let announceTimer = tweened(100);
 
@@ -790,9 +791,19 @@
 					{/each}
 				</div>
 			{:else if $playerStateStore && !$playerStateStore.combat}
-				<CombatTable
+				<!-- <CombatTable
 					{ws}
 					on:select_combat={(e) => {
+						ws.updateCombat({ combat: e.detail.combat });
+					}}
+				/> -->
+
+				<DataTable
+					{ws}
+					on:runCombat={(e) => {
+						ws.updateCombat({ combat: e.detail.combat });
+					}}
+					on:newCombat={(e) => {
 						ws.updateCombat({ combat: e.detail.combat });
 					}}
 				/>

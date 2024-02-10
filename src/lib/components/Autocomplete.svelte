@@ -191,8 +191,9 @@
 <!-- <form autocomplete="off" on:submit|preventDefault={handleFormSubmit}> -->
 <div class="relative w-full">
 	<div class="relative inline-block w-full px-2">
+		<!-- class="border-2 border-solid border-transparent p-3 m-0 w-full bg-" -->
 		<input
-			class="border-2 border-solid border-transparent p-3 m-0 w-full bg-"
+			class="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-foreground file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 			type="text"
 			{placeholder}
 			autocomplete="off"

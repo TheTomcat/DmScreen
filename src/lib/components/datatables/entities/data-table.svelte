@@ -21,6 +21,7 @@
 	import DataTableToolbar from './data-table-toolbar.svelte';
 	import DataTablePcCell from './data-table-pc-cell.svelte';
 	import DataTableImage from './data-table-image.svelte';
+	import DataTableMetadata from './data-table-metadata.svelte';
 	import DataTableData from './data-table-data.svelte';
 
 	const dataStore = writable<Entity[]>([]);
@@ -121,36 +122,37 @@
 			header: 'CR',
 			id: 'cr'
 		}),
-		table.column({
-			accessor: ({ image_id }) => {
-				return { image_id, hasImage: !!image_id };
-			},
-			header: 'Has Image',
-			id: 'hasimage',
-			cell: ({ value }) => {
-				return createRender(DataTableImage, { image_id: value.image_id });
-			}
-			// plugins: {
-			// 	col2Filter: {
-			// 		fn: ({ filterValue, value }) => {
-			// 			// console.log(filterValue, value);
-			// 			if (filterValue.length === 0) return true;
-			// 			if (filterValue.length === 2) return true;
-			// 			if (!Array.isArray(filterValue)) return true;
-			// 			return filterValue.includes('hasimage') == value.hasImage;
-			// 		},
-			// 		initialFilterValue: [],
-			// 		render: ({ filterValue }) => {
-			// 			return get(filterValue);
-			// 		}
-			// 	}
-			// }
-		}),
+		// table.column({
+		// 	accessor: ({ image_id }) => {
+		// 		return { image_id, hasImage: !!image_id };
+		// 	},
+		// 	header: 'Has Image',
+		// 	id: 'hasimage',
+		// 	cell: ({ value }) => {
+		// 		return createRender(DataTableImage, { image_id: value.image_id });
+		// 	}
+
+		// 	// plugins: {
+		// 	// 	col2Filter: {
+		// 	// 		fn: ({ filterValue, value }) => {
+		// 	// 			// console.log(filterValue, value);
+		// 	// 			if (filterValue.length === 0) return true;
+		// 	// 			if (filterValue.length === 2) return true;
+		// 	// 			if (!Array.isArray(filterValue)) return true;
+		// 	// 			return filterValue.includes('hasimage') == value.hasImage;
+		// 	// 		},
+		// 	// 		initialFilterValue: [],
+		// 	// 		render: ({ filterValue }) => {
+		// 	// 			return get(filterValue);
+		// 	// 		}
+		// 	// 	}
+		// 	// }
+		// }),
 		table.column({
 			accessor: (entity) => entity,
 			header: 'Has Data',
 			cell: ({ value }) => {
-				return createRender(DataTableData, { entity: value });
+				return createRender(DataTableMetadata, { entity: value, show_null: false });
 			}
 		}),
 

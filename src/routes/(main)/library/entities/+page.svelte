@@ -1,5 +1,7 @@
 <script lang="ts">
-	import DataTable from './data-table.svelte';
+	import DataTable from '$lib/components/datatables/entities/data-table.svelte';
 </script>
 
-<DataTable />
+<div class="container mx-auto py-10">
+	<DataTable />
+</div>

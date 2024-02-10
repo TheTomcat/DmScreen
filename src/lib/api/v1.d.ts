@@ -1141,6 +1141,11 @@ export interface components {
       overlay_image_id?: number | null;
     };
     /**
+     * SortOption
+     * @enum {string}
+     */
+    SortOption: "desc" | "asc" | "none";
+    /**
      * Tag
      * @description Properties to return to client
      */
@@ -1223,6 +1228,8 @@ export interface operations {
         has_image?: boolean | null;
         has_data?: boolean | null;
         cr?: string | null;
+        sort_by?: "name" | "ac" | "cr" | "initiative" | null;
+        sort_dir?: components["schemas"]["SortOption"];
         /** @description Page number */
         page?: number;
         /** @description Page size */
@@ -1497,6 +1504,8 @@ export interface operations {
         combat_participants_at_least?: number | null;
         combat_participants_at_most?: number | null;
         combat_participants_name?: string | null;
+        sort_by?: "title" | "count" | null;
+        sort_dir?: components["schemas"]["SortOption"];
         /** @description Page number */
         page?: number;
         /** @description Page size */
