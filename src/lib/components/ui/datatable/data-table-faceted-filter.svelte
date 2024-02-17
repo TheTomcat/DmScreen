@@ -8,6 +8,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 
 	import type { selectType } from './data-table';
+	import { createEventDispatcher } from 'svelte';
 	// import type { imageTypes } from './data';
 
 	export let filterValues: string[] = [];
@@ -16,11 +17,17 @@
 
 	let open = false;
 
+	const dispatch = createEventDispatcher<{
+		filterChange: { title: string; key: string; isSelected: boolean };
+	}>();
+
 	const handleSelect = (currentValue: string) => {
 		if (Array.isArray(filterValues) && filterValues.includes(currentValue)) {
 			filterValues = filterValues.filter((v) => v !== currentValue);
+			dispatch('filterChange', { title, key: currentValue, isSelected: false });
 		} else {
 			filterValues = [...(Array.isArray(filterValues) ? filterValues : []), currentValue];
+			dispatch('filterChange', { title, key: currentValue, isSelected: true });
 		}
 	};
 </script>

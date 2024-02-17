@@ -25,6 +25,10 @@ export interface paths {
      */
     post: operations["create_entity"];
   };
+  "/entity/sources": {
+    /** Get Entity Sources */
+    get: operations["get_entity_sources"];
+  };
   "/entity/{entity_id}": {
     /**
      * Get Entity
@@ -35,6 +39,13 @@ export interface paths {
     delete: operations["delete_entity"];
     /** Update Entity */
     patch: operations["update_entity"];
+  };
+  "/entity/json": {
+    /**
+     * Create Entity From Json
+     * @description Create a new entity
+     */
+    post: operations["create_entity_from_json"];
   };
   "/participant/": {
     /**
@@ -90,28 +101,28 @@ export interface paths {
     /** Remove Participant From Combat */
     delete: operations["remove_participant_from_combat"];
   };
-  "/session/": {
+  "/rolltable/": {
     /**
-     * List Sessions
-     * @description Get all sessions
+     * List Rolltables
+     * @description Get all rolltables
      */
-    get: operations["list_sessions"];
+    get: operations["list_rolltables"];
     /**
-     * Create Session
-     * @description Create a new session
+     * Create Rolltable
+     * @description Create a new rolltable
      */
-    post: operations["create_session"];
+    post: operations["create_rolltable"];
   };
-  "/session/{session_id}": {
+  "/rolltable/{rolltable_id}": {
     /**
-     * Get Session
-     * @description Get a single session by id
+     * Get Rolltable
+     * @description Get a single rolltable by id
      */
-    get: operations["get_session"];
-    /** Delete Session */
-    delete: operations["delete_session"];
-    /** Update Session */
-    patch: operations["update_session"];
+    get: operations["get_rolltable"];
+    /** Delete Rolltable */
+    delete: operations["delete_rolltable"];
+    /** Update Rolltable */
+    patch: operations["update_rolltable"];
   };
   "/message/": {
     /**
@@ -275,6 +286,14 @@ export type webhooks = Record<string, never>;
 
 export interface components {
   schemas: {
+    /** Body_create_entity_from_json */
+    Body_create_entity_from_json: {
+      /**
+       * Entity File
+       * Format: binary
+       */
+      entity_file: string;
+    };
     /** Body_upload_image */
     Body_upload_image: {
       /**
@@ -386,11 +405,8 @@ export interface components {
        * @default 10
        */
       ac?: number;
-      /**
-       * Cr
-       * @default 0
-       */
-      cr?: string;
+      /** Cr */
+      cr?: number | null;
       /**
        * Initiative Modifier
        * @default 0
@@ -404,6 +420,8 @@ export interface components {
       entity_id: number;
       /** Data */
       data: string | null;
+      /** Seq */
+      seq?: string | null;
     };
     /** EntityByID */
     EntityByID: {
@@ -434,11 +452,8 @@ export interface components {
        * @default 10
        */
       ac?: number;
-      /**
-       * Cr
-       * @default 0
-       */
-      cr?: string;
+      /** Cr */
+      cr?: number | null;
       /**
        * Initiative Modifier
        * @default 0
@@ -462,7 +477,7 @@ export interface components {
       /** Ac */
       ac?: number | null;
       /** Cr */
-      cr?: string | null;
+      cr?: number | null;
       /** Initiative Modifier */
       initiative_modifier?: number | null;
       /** Source */
@@ -504,6 +519,8 @@ export interface components {
        * @default []
        */
       entities?: components["schemas"]["EntityByID"][];
+      /** Seq */
+      seq?: string | null;
     };
     /** ImageB64 */
     ImageB64: {
@@ -534,6 +551,8 @@ export interface components {
        * @default []
        */
       entities?: components["schemas"]["EntityByID"][];
+      /** Seq */
+      seq?: string | null;
       /** B64 */
       b64: string | null;
     };
@@ -590,6 +609,8 @@ export interface components {
        * @default []
        */
       entities?: components["schemas"]["EntityByID"][];
+      /** Seq */
+      seq?: string | null;
       /** Url */
       url: string;
       /** Thumbnail Url */
@@ -710,10 +731,10 @@ export interface components {
       /** Pages */
       pages?: number | null;
     };
-    /** Page[Tag] */
-    Page_Tag_: {
+    /** Page[RollTable] */
+    Page_RollTable_: {
       /** Items */
-      items: components["schemas"]["Tag"][];
+      items: components["schemas"]["RollTable"][];
       /** Total */
       total: number | null;
       /** Page */
@@ -723,10 +744,10 @@ export interface components {
       /** Pages */
       pages?: number | null;
     };
-    /** Page[Union[SessionEmptyId, SessionBackdropId, SessionLoadingId, SessionCombatId, SessionHandoutId, SessionMapId]] */
-    Page_Union_SessionEmptyId__SessionBackdropId__SessionLoadingId__SessionCombatId__SessionHandoutId__SessionMapId__: {
+    /** Page[Tag] */
+    Page_Tag_: {
       /** Items */
-      items: (components["schemas"]["SessionEmptyId"] | components["schemas"]["SessionBackdropId"] | components["schemas"]["SessionLoadingId"] | components["schemas"]["SessionCombatId"] | components["schemas"]["SessionHandoutId"] | components["schemas"]["SessionMapId"])[];
+      items: components["schemas"]["Tag"][];
       /** Total */
       total: number | null;
       /** Page */
@@ -893,252 +914,80 @@ export interface components {
       /** Participant Id */
       participant_id: number;
     };
-    /** SessionBackdrop */
-    SessionBackdrop: {
-      /**
-       * Mode
-       * @constant
-       */
-      mode: "backdrop";
-      /**
-       * Title
-       * @default
-       */
-      title?: string;
-      /** Backdrop Id */
-      backdrop_id: number | null;
+    /** RollTable */
+    RollTable: {
+      /** Name */
+      name: string;
+      /** Rows */
+      rows: components["schemas"]["RollTableRow"][];
+      /** Rolltable Id */
+      rolltable_id: number;
     };
-    /** SessionBackdropId */
-    SessionBackdropId: {
-      /**
-       * Mode
-       * @constant
-       */
-      mode: "backdrop";
-      /**
-       * Title
-       * @default
-       */
-      title?: string;
-      /** Session Id */
-      session_id: number;
-      /** Ws Url */
-      ws_url: string;
-      backdrop: components["schemas"]["ImageURL"];
-      /** Backdrop Id */
-      backdrop_id: number;
+    /** RollTableBase */
+    RollTableBase: {
+      /** Name */
+      name: string;
+      /** Rows */
+      rows: components["schemas"]["RollTableRowBase"][];
     };
-    /** SessionCombat */
-    SessionCombat: {
+    /** RollTableRow */
+    RollTableRow: {
+      /** Name */
+      name: string;
+      /** Display Name */
+      display_name: string;
       /**
-       * Mode
-       * @constant
+       * Weight
+       * @default 1
        */
-      mode: "combat";
-      /**
-       * Title
-       * @default
-       */
-      title?: string;
-      /** Backdrop Id */
-      backdrop_id: number | null;
-      /** Combat Id */
-      combat_id: number;
+      weight?: number;
+      /** Category */
+      category?: string | null;
+      /** Extra Data */
+      extra_data?: components["schemas"]["RollTableRowData"][] | null;
+      /** Rolltable Row Id */
+      rolltable_row_id: number;
     };
-    /** SessionCombatId */
-    SessionCombatId: {
+    /** RollTableRowBase */
+    RollTableRowBase: {
+      /** Name */
+      name: string;
+      /** Display Name */
+      display_name: string;
       /**
-       * Mode
-       * @constant
+       * Weight
+       * @default 1
        */
-      mode: "combat";
-      /**
-       * Title
-       * @default
-       */
-      title?: string;
-      /** Session Id */
-      session_id: number;
-      /** Ws Url */
-      ws_url: string;
-      backdrop: components["schemas"]["ImageURL"];
-      /** Backdrop Id */
-      backdrop_id: number;
-      combat: components["schemas"]["Combat"];
-      /** Combat Id */
-      combat_id: number;
+      weight?: number;
+      /** Category */
+      category?: string | null;
+      /** Extra Data */
+      extra_data?: components["schemas"]["RollTableRowData"][] | null;
     };
-    /** SessionEmpty */
-    SessionEmpty: {
-      /**
-       * Mode
-       * @default empty
-       * @constant
-       */
-      mode?: "empty";
-      /**
-       * Title
-       * @default
-       */
-      title?: string;
+    /** RollTableRowData */
+    RollTableRowData: {
+      /** Data */
+      data: string;
     };
-    /** SessionEmptyId */
-    SessionEmptyId: {
-      /**
-       * Mode
-       * @constant
-       */
-      mode: "empty";
-      /**
-       * Title
-       * @default
-       */
-      title?: string;
-      /** Session Id */
-      session_id: number;
-      /** Ws Url */
-      ws_url: string;
+    /** RollTableRowUpdate */
+    RollTableRowUpdate: {
+      /** Name */
+      name?: string | null;
+      /** Display Name */
+      display_name?: string | null;
+      /** Weight */
+      weight?: number | null;
+      /** Category */
+      category?: string | null;
+      /** Extra Data */
+      extra_data?: components["schemas"]["RollTableRowData"][] | null;
     };
-    /** SessionHandout */
-    SessionHandout: {
-      /**
-       * Mode
-       * @constant
-       */
-      mode: "handout";
-      /**
-       * Title
-       * @default
-       */
-      title?: string;
-      /** Backdrop Id */
-      backdrop_id: number | null;
-      /** Overlay Image Id */
-      overlay_image_id: number;
-    };
-    /** SessionHandoutId */
-    SessionHandoutId: {
-      /**
-       * Mode
-       * @constant
-       */
-      mode: "handout";
-      /**
-       * Title
-       * @default
-       */
-      title?: string;
-      /** Session Id */
-      session_id: number;
-      /** Ws Url */
-      ws_url: string;
-      backdrop: components["schemas"]["ImageURL"];
-      /** Backdrop Id */
-      backdrop_id: number;
-      overlay_image: components["schemas"]["ImageURL"];
-      /** Overlay Image Id */
-      overlay_image_id: number;
-    };
-    /** SessionLoading */
-    SessionLoading: {
-      /**
-       * Mode
-       * @constant
-       */
-      mode: "loading";
-      /**
-       * Title
-       * @default
-       */
-      title?: string;
-      /** Backdrop Id */
-      backdrop_id: number | null;
-      /** Message Id */
-      message_id: number | null;
-    };
-    /** SessionLoadingId */
-    SessionLoadingId: {
-      /**
-       * Mode
-       * @constant
-       */
-      mode: "loading";
-      /**
-       * Title
-       * @default
-       */
-      title?: string;
-      /** Session Id */
-      session_id: number;
-      /** Ws Url */
-      ws_url: string;
-      backdrop: components["schemas"]["ImageURL"];
-      /** Backdrop Id */
-      backdrop_id: number;
-      message: components["schemas"]["Message"];
-      /** Message Id */
-      message_id: number;
-    };
-    /** SessionMap */
-    SessionMap: {
-      /**
-       * Mode
-       * @constant
-       */
-      mode: "map";
-      /**
-       * Title
-       * @default
-       */
-      title?: string;
-      /** Backdrop Id */
-      backdrop_id: number | null;
-      /** Overlay Image Id */
-      overlay_image_id: number;
-    };
-    /** SessionMapId */
-    SessionMapId: {
-      /**
-       * Mode
-       * @constant
-       */
-      mode: "map";
-      /**
-       * Title
-       * @default
-       */
-      title?: string;
-      /** Session Id */
-      session_id: number;
-      /** Ws Url */
-      ws_url: string;
-      backdrop: components["schemas"]["ImageURL"];
-      /** Backdrop Id */
-      backdrop_id: number;
-      overlay_image: components["schemas"]["ImageURL"];
-      /** Overlay Image Id */
-      overlay_image_id: number;
-    };
-    /** SessionUpdate */
-    SessionUpdate: {
-      /**
-       * Mode
-       * @default empty
-       */
-      mode?: "empty" | "loading" | "backdrop" | "overlay" | "map";
-      /**
-       * Title
-       * @default
-       */
-      title?: string | null;
-      /** Backdrop Id */
-      backdrop_id?: number | null;
-      /** Combat Id */
-      combat_id?: number | null;
-      /** Message Id */
-      message_id?: number | null;
-      /** Overlay Image Id */
-      overlay_image_id?: number | null;
+    /** RollTableUpdate */
+    RollTableUpdate: {
+      /** Name */
+      name?: string | null;
+      /** Rows */
+      rows?: components["schemas"]["RollTableRowUpdate"][] | null;
     };
     /**
      * SortOption
@@ -1228,7 +1077,8 @@ export interface operations {
         has_image?: boolean | null;
         has_data?: boolean | null;
         cr?: string | null;
-        sort_by?: "name" | "ac" | "cr" | "initiative" | null;
+        source?: string | null;
+        sort_by?: "name" | "ac" | "cr" | "initiative" | "source" | "seq" | null;
         sort_dir?: components["schemas"]["SortOption"];
         /** @description Page number */
         page?: number;
@@ -1276,6 +1126,17 @@ export interface operations {
       422: {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Get Entity Sources */
+  get_entity_sources: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": (string | null)[];
         };
       };
     };
@@ -1349,6 +1210,35 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["Entity"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Create Entity From Json
+   * @description Create a new entity
+   */
+  create_entity_from_json: {
+    requestBody: {
+      content: {
+        "multipart/form-data": components["schemas"]["Body_create_entity_from_json"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Conflict Error */
+      409: {
+        content: never;
       };
       /** @description Validation Error */
       422: {
@@ -1504,7 +1394,7 @@ export interface operations {
         combat_participants_at_least?: number | null;
         combat_participants_at_most?: number | null;
         combat_participants_name?: string | null;
-        sort_by?: "title" | "count" | null;
+        sort_by?: "title" | "num_participants" | null;
         sort_dir?: components["schemas"]["SortOption"];
         /** @description Page number */
         page?: number;
@@ -1687,10 +1577,10 @@ export interface operations {
     };
   };
   /**
-   * List Sessions
-   * @description Get all sessions
+   * List Rolltables
+   * @description Get all rolltables
    */
-  list_sessions: {
+  list_rolltables: {
     parameters: {
       query?: {
         /** @description Page number */
@@ -1703,7 +1593,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["Page_Union_SessionEmptyId__SessionBackdropId__SessionLoadingId__SessionCombatId__SessionHandoutId__SessionMapId__"];
+          "application/json": components["schemas"]["Page_RollTable_"];
         };
       };
       /** @description Validation Error */
@@ -1715,20 +1605,20 @@ export interface operations {
     };
   };
   /**
-   * Create Session
-   * @description Create a new session
+   * Create Rolltable
+   * @description Create a new rolltable
    */
-  create_session: {
+  create_rolltable: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["SessionEmpty"] | components["schemas"]["SessionBackdrop"] | components["schemas"]["SessionLoading"] | components["schemas"]["SessionCombat"] | components["schemas"]["SessionHandout"] | components["schemas"]["SessionMap"];
+        "application/json": components["schemas"]["RollTableBase"];
       };
     };
     responses: {
       /** @description Successful Response */
       201: {
         content: {
-          "application/json": components["schemas"]["SessionEmptyId"] | components["schemas"]["SessionBackdropId"] | components["schemas"]["SessionLoadingId"] | components["schemas"]["SessionCombatId"] | components["schemas"]["SessionHandoutId"] | components["schemas"]["SessionMapId"];
+          "application/json": components["schemas"]["RollTable"];
         };
       };
       /** @description Conflict Error */
@@ -1744,23 +1634,23 @@ export interface operations {
     };
   };
   /**
-   * Get Session
-   * @description Get a single session by id
+   * Get Rolltable
+   * @description Get a single rolltable by id
    */
-  get_session: {
+  get_rolltable: {
     parameters: {
       path: {
-        session_id: number;
+        rolltable_id: number;
       };
     };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["SessionEmptyId"] | components["schemas"]["SessionBackdropId"] | components["schemas"]["SessionLoadingId"] | components["schemas"]["SessionCombatId"] | components["schemas"]["SessionHandoutId"] | components["schemas"]["SessionMapId"];
+          "application/json": components["schemas"]["RollTable"];
         };
       };
-      /** @description Session not found */
+      /** @description RollTable not found */
       404: {
         content: never;
       };
@@ -1772,11 +1662,11 @@ export interface operations {
       };
     };
   };
-  /** Delete Session */
-  delete_session: {
+  /** Delete Rolltable */
+  delete_rolltable: {
     parameters: {
       path: {
-        session_id: number;
+        rolltable_id: number;
       };
     };
     responses: {
@@ -1794,23 +1684,23 @@ export interface operations {
       };
     };
   };
-  /** Update Session */
-  update_session: {
+  /** Update Rolltable */
+  update_rolltable: {
     parameters: {
       path: {
-        session_id: number;
+        rolltable_id: number;
       };
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["SessionUpdate"];
+        "application/json": components["schemas"]["RollTableUpdate"];
       };
     };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["SessionEmptyId"] | components["schemas"]["SessionBackdropId"] | components["schemas"]["SessionLoadingId"] | components["schemas"]["SessionCombatId"] | components["schemas"]["SessionHandoutId"] | components["schemas"]["SessionMapId"];
+          "application/json": components["schemas"]["RollTable"];
         };
       };
       /** @description Validation Error */
@@ -1829,6 +1719,8 @@ export interface operations {
     parameters: {
       query?: {
         message?: string | null;
+        sort_by?: "message" | null;
+        sort_dir?: components["schemas"]["SortOption"];
         /** @description Page number */
         page?: number;
         /** @description Page size */
@@ -1981,6 +1873,8 @@ export interface operations {
         name?: string | null;
         type?: components["schemas"]["ImageType"] | null;
         types?: string | null;
+        sort_by?: string | null;
+        sort_dir?: components["schemas"]["SortOption"];
         /** @description Page number */
         page?: number;
         /** @description Page size */

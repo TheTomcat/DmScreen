@@ -7,7 +7,9 @@
 		addPagination,
 		addTableFilter,
 		addSelectedRows,
-		addColumnFilters
+		addColumnFilters,
+		addHiddenColumns,
+		addSortBy
 	} from 'svelte-headless-table/plugins';
 	// import DataTableCheckbox from './data-table-checkbox.svelte';
 
@@ -32,8 +34,9 @@
 	import DataTablePcCell from '$lib/components/datatables/entities/data-table-pc-cell.svelte';
 	import DataTableImage from '$lib/components/datatables/entities/data-table-image.svelte';
 	import DataTableData from '$lib/components/datatables/entities/data-table-data.svelte';
-	import { createEventDispatcher } from 'svelte';
+	import { createEventDispatcher, onMount } from 'svelte';
 	import DataTableMetadata from '$lib/components/datatables/entities/data-table-metadata.svelte';
+	import { decodeCR } from '$lib';
 
 	const dataStore = writable<Entity[]>([]);
 	const totalCount = writable<number>(1);
@@ -51,7 +54,8 @@
 		pc: pcType[],
 		hasImage: hasImageType[],
 		hasData: hasDataType[],
-		crs: CRType[]
+		crs: CRType[],
+		sources: string[]
 	) => {
 		let is_PC: boolean | undefined =
 			pc.length == 0 || pc.length == 2 ? undefined : pc.includes('pc');
@@ -62,13 +66,14 @@
 		let has_data: boolean | undefined =
 			hasData.length == 0 || hasData.length == 2 ? undefined : hasData.includes('data');
 		let cr = crs.length == 0 ? undefined : crs.join('|');
+		let source = sources.length == 0 ? undefined : sources.join('|');
 		// hasData == 'data' ? true : hasData == 'nodata' ? false : undefined;
 		// let has_image: boolean | undefined =
 		// hasimage === 'pc,npc' ? undefined : pc === 'pc' ? true : pc === 'npc' ? false : undefined;
 		return client
 			.GET('/entity/', {
 				params: {
-					query: { page: page + 1, size, name, is_PC, has_image, has_data, cr }
+					query: { page: page + 1, size, name, is_PC, has_image, has_data, cr, source }
 				}
 			})
 			.then((response) => {
@@ -89,7 +94,14 @@
 			serverSide: true
 		}),
 		select: addSelectedRows({}),
-		colFilter: addColumnFilters({ serverSide: true })
+		colFilter: addColumnFilters({ serverSide: true }),
+		hide: addHiddenColumns({ initialHiddenColumnIds: ['source'] }),
+		sort: addSortBy({
+			serverSide: true,
+			disableMultiSort: true,
+			initialSortKeys: [{ id: 'name', order: 'asc' }],
+			toggleOrder: ['asc', 'desc']
+		})
 	});
 
 	const columns = table.createColumns([
@@ -124,12 +136,7 @@
 			accessor: ({ cr }) => cr,
 			header: 'CR',
 			id: 'cr',
-			plugins: {
-				colFilter: {
-					initialFilterValue: [],
-					fn: () => true
-				}
-			}
+			cell: ({ value }) => decodeCR(value) || ''
 		}),
 		table.column({
 			accessor: (entity) => {
@@ -198,6 +205,20 @@
 					fn: () => true
 				}
 			}
+		}),
+		table.column({
+			accessor: ({ source, source_page }) => {
+				return { source, source_page };
+			},
+			header: 'Source',
+			id: 'source',
+			cell: ({ value }) => (value.source ? `${value.source} p${value.source_page}` : ''),
+			plugins: {
+				colFilter: {
+					initialFilterValue: [],
+					fn: () => true
+				}
+			}
 		})
 
 		// table.column({
@@ -225,6 +246,7 @@
 			hasImage: hasImageType[];
 			hasData: hasDataType[];
 			cr: CRType[];
+			source: string[];
 		}>;
 	} = pluginStates.colFilter;
 
@@ -238,6 +260,7 @@
 	// } = pluginStates.col2Filter;
 
 	const { selectedDataIds } = pluginStates.select;
+	const { sortKeys } = pluginStates.sort;
 
 	$: {
 		if (
@@ -246,10 +269,11 @@
 			$filterValues.pc &&
 			$filterValues.hasData &&
 			$filterValues.hasImage &&
-			$filterValues.cr
+			$filterValues.cr &&
+			$filterValues.source
 		) {
 			//&& $filterValues && $filterValues.pc) {
-
+			$sortKeys;
 			getEntities(
 				$pageIndex,
 				$pageSize,
@@ -257,10 +281,12 @@
 				$filterValues.pc,
 				$filterValues.hasImage,
 				$filterValues.hasData,
-				$filterValues.cr
+				$filterValues.cr,
+				$filterValues.source
 			);
 		}
 	}
+	onMount(() => getEntities(0, 20, '', [], [], [], [], []));
 </script>
 
 <div class="space-y-4">

@@ -641,7 +641,7 @@ export class wsController {
      * @param combat_id 
      * @param participants list of partial participants, only supports initiative and hp at this point.
      */
-    async updateParticipants(combat_id: number, participants: { participant_id: number, initiative: number | undefined, initiative_modifier: number | undefined, max_hp: number | undefined, damage: number | undefined }[]) {
+    async updateParticipants(combat_id: number, participants: ({ participant_id: number } & Partial<{ initiative: number, initiative_modifier: number, max_hp: number, damage: number }>)[]) {
         let response = await client.PATCH('/combat/{combat_id}',
             {
                 params: {
@@ -650,11 +650,12 @@ export class wsController {
                 body: {
                     participants: participants.map(p => {
                         return {
-                            participant_id: p.participant_id,
-                            initiative: p.initiative,
-                            initiative_modifier: p.initiative_modifier,
-                            max_hp: p.max_hp,
-                            damage: p.damage
+                            ...p
+                            // participant_id: p.participant_id,
+                            // initiative: p.initiative,
+                            // initiative_modifier: p.initiative_modifier,
+                            // max_hp: p.max_hp,
+                            // damage: p.damage
                         }
                     })
                 }
@@ -684,7 +685,7 @@ export class wsController {
                     ...playerState,
                     combat: {
                         ...playerState.combat,
-                        participants: [
+                        participants: [ // Update the participants, modifying the updated participants as appropriate 
                             ...(playerState.combat.participants.filter(p => !updated_participants.find(up => p.participant_id == up.participant_id)) || []),
                             ...(playerState.combat.participants.filter(p => updated_participants.find(up => p.participant_id == up.participant_id)) || []).map(p => {
                                 return {
@@ -802,8 +803,8 @@ export class wsController {
 }
 
 const PRESET_KEY = 'presets';
-export type Preset = { key: string, state: playerState }
-export const savePreset = (name: string) => {
+export type Preset = { key: string, state: Partial<playerState> }
+export const saveStateAsPreset = (name: string) => {
     let currentState = get(playerStateStore);
     if (currentState.combat) console.warn("It isn't recommended to save combat. Weird stuff might happen.")
     let presets: Preset[] = JSON.parse(localStorage.getItem(PRESET_KEY) || '[]');
@@ -817,14 +818,36 @@ export const savePreset = (name: string) => {
     localStorage.setItem('presets', JSON.stringify(presets))
 }
 
+export const savePreset = (name: string, preset: Partial<playerState>) => {
+    let presets: Preset[] = JSON.parse(localStorage.getItem(PRESET_KEY) || '[]');
+    presets = [
+        ...presets.filter(p => p.key.toLocaleLowerCase() !== name.toLocaleLowerCase()),
+        {
+            key: name.toLocaleLowerCase(),
+            state: preset
+        }
+    ]
+    localStorage.setItem('presets', JSON.stringify(presets))
+}
+
 export const loadPresetByKey = (name: string) => {
     let presets: Preset[] = JSON.parse(localStorage.getItem(PRESET_KEY) || '[]');
-    let currentState: playerState | undefined = presets.find(p => p.key.toLocaleLowerCase() === name.toLocaleLowerCase())?.state
-    if (currentState) playerStateStore.set(currentState)
+    let currentState: Partial<playerState> | undefined = presets.find(p => p.key.toLocaleLowerCase() === name.toLocaleLowerCase())?.state
+    if (currentState) playerStateStore.update((playerState) => {
+        return { ...playerState, ...currentState }
+    })
 }
 
 export const loadPresetFromObject = (preset: Preset) => {
-    playerStateStore.set(preset.state)
+    playerStateStore.update((playerState) => {
+        return { ...playerState, ...preset.state }
+    })
+}
+
+export const deletePreset = (name: string) => {
+    let presets: Preset[] = JSON.parse(localStorage.getItem(PRESET_KEY) || '[]');
+    presets = presets.filter(p => p.key !== name)
+    localStorage.setItem('presets', JSON.stringify(presets))
 }
 
 

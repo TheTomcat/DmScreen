@@ -49,5 +49,11 @@
 	}
 </script>
 
-<Checkbox bind:checked on:click={handleToggle} />
+<div class="flex justify-center">
+	{#if id}
+		<Checkbox bind:checked on:click={handleToggle} />
+	{:else if $selected.length}
+		<Checkbox bind:checked on:click={handleToggle} />
+	{/if}
+</div>
 <!-- {#if id}{id}: {/if}<Checkbox bind:checked={$checked} on:change/> -->

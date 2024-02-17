@@ -9,9 +9,7 @@
 	import { DicesIcon, Droplets } from 'lucide-svelte';
 	import type { components } from '$lib/api/v1';
 	import { roll_dice, sort_participants_naive } from '$lib';
-	// import Dialog from './../Dialog.svelte';
 	import InitiativeRow from './../InitiativeRow.svelte';
-	import HitPointRow from './HitPointRow.svelte';
 
 	const dispatch = createEventDispatcher<{
 		changeParticipant: { participants: PartialParticipant[] };

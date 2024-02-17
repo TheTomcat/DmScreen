@@ -140,18 +140,5 @@ Image Type: <ImageTypeSelectBox bind:selected={selectedType} onSelectedChange={(
 </div>
 <Button on:click={applyTags}><ImagePlus class="h-4 w-4 mr-1" />Apply Tags</Button>
 
-<!-- <div style="margin: 5px;">
-	{#if files.accepted.length > 0}
-		<button on:click={handleRemoveAll}>RemoveAll</button>
-	{/if}
-	{#each files.accepted as item, index}
-		<div>
-			<span>{item.name}</span>
-			<button on:click={(e) => handleRemoveFile(e, index)}>Remove</button>
-		</div>
-	{/each}
-</div> -->
-
 <style>
-
 </style>

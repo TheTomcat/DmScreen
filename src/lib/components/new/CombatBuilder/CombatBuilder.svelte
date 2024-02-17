@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Combat, Entity, Participant } from '../../../../app';
+	import type { AnyEntity, Combat, Entity, Participant, QuickEntity } from '../../../../app';
 
 	import { Minus, Plus, PlusSquare, X } from 'lucide-svelte';
 
@@ -33,16 +33,6 @@
 	let mainAddDialogOpen: boolean = false;
 	let selectionOpen: boolean = false;
 
-	type QuickEntity = {
-		name: string;
-		initiative: number;
-		ac: number;
-		hit_points: number;
-		entity_id: number;
-		cr: undefined;
-		image_id?: number;
-	};
-	type AnyEntity = Entity | QuickEntity;
 	let quickEntityId = -1;
 	let quickEntity: QuickEntity = {
 		name: '',
@@ -53,7 +43,7 @@
 		cr: undefined
 	};
 
-	let combatants: { entity: AnyEntity; count: number }[] = [];
+	export let combatants: { entity: AnyEntity; count: number }[] = [];
 
 	let flipDurationMs: number = 200;
 

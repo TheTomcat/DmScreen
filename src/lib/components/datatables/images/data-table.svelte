@@ -7,7 +7,8 @@
 		addPagination,
 		addTableFilter,
 		addSelectedRows,
-		addColumnFilters
+		addColumnFilters,
+		addSortBy
 	} from 'svelte-headless-table/plugins';
 
 	import client from '$lib/api/index';
@@ -28,9 +29,14 @@
 	import type { imageTypes } from './data';
 	import CollectionSelectionBox from '$lib/components/new/CollectionSelectionBox.svelte';
 	import { toast } from 'svelte-sonner';
+	import Badge from '$lib/components/ui/badge/badge.svelte';
+	import DataTableImageTypeCell from './data-table-image-type-cell.svelte';
 	type imageType = (typeof imageTypes)[number]['value'];
 
 	// let data: ImageURL[] = [];
+
+	export let interactive: boolean = false;
+
 	const dataStore = writable<ImageURL[]>([]);
 	const totalCount = writable<number>(1);
 
@@ -48,7 +54,14 @@
 		return client
 			.GET('/image/', {
 				params: {
-					query: { page: page + 1, size: perPage, name: q, types }
+					query: {
+						page: page + 1,
+						size: perPage,
+						name: q,
+						types,
+						sort_by: $sortKeys[0].id,
+						sort_dir: $sortKeys[0].order
+					}
 				}
 			})
 			.then((response) => {
@@ -107,7 +120,13 @@
 			}
 		}),
 		select: addSelectedRows({}),
-		colFilter: addColumnFilters({ serverSide: true })
+		colFilter: addColumnFilters({ serverSide: true }),
+		sort: addSortBy({
+			serverSide: true,
+			disableMultiSort: true,
+			initialSortKeys: [{ id: 'name', order: 'asc' }],
+			toggleOrder: ['asc', 'desc']
+		})
 	});
 
 	const columns = table.createColumns([
@@ -141,10 +160,11 @@
 				}
 			}
 		}),
-		// table.column({
-		// 	accessor: 'image_id',
-		// 	header: 'ID'
-		// }),
+		table.column({
+			accessor: 'image_id',
+			id: 'id',
+			header: 'ID'
+		}),
 		table.column({
 			accessor: ({ entities }) => entities,
 			header: 'Has Entity',
@@ -173,16 +193,29 @@
 				return { type, image_id };
 			},
 			header: 'Image Type',
+			id: 'type',
 			cell: ({ value }) => {
 				let { type, image_id } = value;
-				return createRender(ImageTypeSelectBox, {
-					selected: type,
-					onSelectedChange: () =>
-						client.PATCH('/image/{image_id}', {
-							params: { path: { image_id } },
-							body: { type }
-						})
-				});
+				return interactive
+					? createRender(ImageTypeSelectBox, {
+							selected: type,
+							onSelectedChange: () =>
+								client.PATCH('/image/{image_id}', {
+									params: { path: { image_id } },
+									body: { type }
+								})
+					  })
+					: createRender(DataTableImageTypeCell, { value: type });
+			}
+		}),
+		table.column({
+			accessor: ({ dimension_x, dimension_y }) => {
+				return { dimension_x, dimension_y };
+			},
+			id: 'dimensions',
+			header: 'Dimensions',
+			cell: ({ value }) => {
+				return `${value.dimension_x} x ${value.dimension_y}`;
 			}
 		})
 		// table.column({
@@ -207,10 +240,13 @@
 
 	const { selectedDataIds } = pluginStates.select;
 
+	const { sortKeys } = pluginStates.sort;
+
 	$: {
 		if (browser && $filterValues && $filterValues.type) {
 			// console.log($pageIndex, $pageSize);
 			// console.log($filterValues);
+			$sortKeys;
 			getImages($pageIndex, $pageSize, $filterValue, $filterValues.type.join('|'));
 		}
 	}
@@ -264,9 +300,15 @@
 					<Subscribe rowAttrs={headerRow.attrs()}>
 						<Table.Row>
 							{#each headerRow.cells as cell (cell.id)}
-								<Subscribe attrs={cell.attrs()} let:attrs props={cell.props()}>
+								<Subscribe attrs={cell.attrs()} let:attrs props={cell.props()} let:props>
 									<Table.Head {...attrs} class="[&:has([role=checkbox])]:pl-3">
-										<Render of={cell.render()} />
+										{#if cell.id == 'name' || cell.id == 'type' || cell.id == 'dimensions'}
+											<DataTable.HeadingSort {props}>
+												<Render of={cell.render()} />
+											</DataTable.HeadingSort>
+										{:else}
+											<Render of={cell.render()} />
+										{/if}
 									</Table.Head>
 								</Subscribe>
 							{/each}

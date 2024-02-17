@@ -142,7 +142,7 @@
 				<hr />
 				<div class="grid grid-cols-[auto_1fr] gap-x-2">
 					<!-- flex flex-col my-3 -->
-					{#if renderData.saves}
+					{#if renderData.save}
 						<span class="font-bold">Saves:</span>
 						<span>{renderSaves(renderData)}</span>
 					{/if}

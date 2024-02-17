@@ -1,3 +1,4 @@
+import { encodeCR } from '$lib';
 import { User, Cat, Image, ImageOff, Subtitles } from 'lucide-svelte';
 
 
@@ -28,4 +29,4 @@ export const CRList = [
     "27", "28", "29", "30"
 ] as const;
 export type CRType = typeof CRList[number];
-export const CR = CRList.map(c => { return { value: c, label: c, icon: undefined } });
+export const CR = CRList.map(c => { return { value: `${encodeCR(c)}`, label: c, icon: undefined } });

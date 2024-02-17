@@ -30,6 +30,8 @@ type ParticipantUpdate = components['schemas']['ParticipantUpdate'];
 type Combat = components['schemas']['Combat'];
 type Session = components['schemas']['Session'];
 type Collection = components['schemas']['Collection'];
+type RollTable = components['schemas']['RollTable'];
+type RollTableRow = components['schemas']['RollTableRow'];
 
 export type _ImageMatch = {
 	image: Image;
@@ -53,3 +55,14 @@ export type Initiative = {
 	combat_id: number;
 	rolls: InitiativeRoll[];
 }
+
+type QuickEntity = {
+	name: string;
+	initiative: number;
+	ac: number;
+	hit_points: number;
+	entity_id: number;
+	cr: undefined;
+	image_id?: number;
+};
+type AnyEntity = Entity | QuickEntity;

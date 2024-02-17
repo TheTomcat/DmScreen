@@ -3,6 +3,8 @@
 	import { onMount } from 'svelte';
 	import type { Tag } from '../../../../app';
 	import { toast } from '@zerodevx/svelte-toast';
+	import { Button } from '$lib/components/ui/button';
+	import { ArrowLeft, Check, CheckCircle } from 'lucide-svelte';
 
 	let allTags: Tag[] = [];
 	let orphanTags: Tag[] = [];
@@ -65,6 +67,10 @@
 
 	let matchWhitespace = (tag: Tag) => {
 		return tag.tag.trimStart().trimEnd();
+	};
+
+	const findWhitespaceTagsFromMatchStructure = (m: Match) => {
+		return m.tags.length > 1 || m.name !== m.tags[0].tag;
 	};
 
 	// let makeWhitespaceEquivClasses = (tags: Tag[], match: (t: Tag) => string) => {
@@ -219,84 +225,122 @@
 
 	/// Display functions
 	const renderTagWhitespace = (t: Tag): string => {
-		return t.tag.replace(' ', '_');
+		return t.tag.replaceAll(' ', '_');
 	};
 </script>
 
-<h3>Whitespace Tags</h3>
-<table>
-	<thead>
-		<th>Tag Name</th>
-		<th>Found Tags</th>
-		<th>Fix</th>
-	</thead>
-	<tbody>
-		{#each whitespaceTags.filter((m) => m.tags.length > 1) as match}
-			<tr>
-				<td>{match.name}</td>
-				<td>
-					{match.tags.map(renderTagWhitespace).join(', ')}
-				</td>
-				<td>
-					<button
-						on:click={() => {
-							mergeAllTags(match);
-						}}>Fix</button
-					>
-				</td>
-			</tr>
-		{:else}
-			<tr><td colspan="3"> No whitespace-padded tags found </td></tr>
-		{/each}
-	</tbody>
-</table>
+<div class="border rounded my-3 p-2">
+	<h3 class="text-xl flex gap-1 items-center">
+		Whitespace Tags
+		{#if whitespaceTags.filter(findWhitespaceTagsFromMatchStructure).length == 0}
+			<CheckCircle class="text-green-500 w-4 h-4" />
+		{/if}
+	</h3>
+	<table>
+		<thead>
+			<th>Tag Name</th>
+			<th>Found Tags</th>
+			<th>Fix</th>
+		</thead>
+		<tbody>
+			{#each whitespaceTags.filter(findWhitespaceTagsFromMatchStructure) as match}
+				<tr>
+					<td>{match.name}</td>
+					<td>
+						{match.tags.map(renderTagWhitespace).join(', ')}
+					</td>
+					<td>
+						<Button
+							on:click={() => {
+								mergeAllTags(match);
+							}}>Fix</Button
+						>
+					</td>
+				</tr>
+			{:else}
+				<tr><td colspan="3"> No whitespace-padded tags found </td></tr>
+			{/each}
+		</tbody>
+	</table>
+</div>
 
-<h3>Long Tags</h3>
-<input type="range" min="10" max="30" bind:value={lengthThreshold} />
-{lengthThreshold}
-{#each allTags.filter((t) => t.tag.length > lengthThreshold) as tag}
-	<button>{tag.tag.replace(' ', '_')}</button>
-{:else}
-	<div>No long tags found</div>
-{/each}
-
-<h3>Orphan Tags</h3>
-{#await getOrphanTags()}
-	Loading orphan tags
-{:then orphanTags}
-	{#if orphanTags && orphanTags.length > 0}
-		{#each orphanTags as tag (tag.tag_id)}
-			<button on:click={() => deleteTag(tag)}>{tag.tag.replace(' ', '_')}</button>
-		{/each}
+<div class="border rounded my-3 p-2">
+	<h3 class="text-xl flex gap-1 items-center">
+		Long Tags
+		{#if allTags.filter((t) => t.tag.length > lengthThreshold).length == 0}
+			<CheckCircle class="text-green-500 w-4 h-4" />
+		{/if}
+	</h3>
+	<div class="flex gap-2">
+		Threshold:<input type="range" min="10" max="30" bind:value={lengthThreshold} />
+		{lengthThreshold}
+	</div>
+	{#each allTags.filter((t) => t.tag.length > lengthThreshold) as tag}
+		<Button>{renderTagWhitespace(tag)}</Button>
 	{:else}
-		No orphan tags found
-	{/if}
-{/await}
+		<div>No long tags found</div>
+	{/each}
+</div>
 
-<h3>Similar Tags</h3>
-<input type="range" min="0" max="100" bind:value={similarityThreshold} />
-{similarityThreshold}%
-<table style="width:100%">
-	<thead>
-		<th>Key</th>
-		<th>Matches</th>
-	</thead>
-	<tbody>
-		{#each similarTags as t}
-			<tr>
-				<td
-					><button
-						on:click={() => {
-							mergeAllTags(t);
-						}}>{t.name.replace(' ', '_')}</button
-					></td
-				>
-				<td>
-					<!-- {#each t.tags as j} -->
-					{t.tags.map((t) => t.tag.replace(' ', '_')).join(', ')}
-					<!-- {/each} -->
-				</td>
-			</tr>
-		{/each}
-	</tbody>
-</table>
+<div class="border rounded my-3 p-2">
+	{#await getOrphanTags()}
+		Loading orphan tags
+	{:then orphanTags}
+		<h3 class="text-xl flex gap-1 items-center">
+			Orphan Tags
+			{#if orphanTags?.length == 0}
+				<CheckCircle class="text-green-500 w-4 h-4" />
+			{/if}
+		</h3>
+		{#if orphanTags && orphanTags.length > 0}
+			{#each orphanTags as tag (tag.tag_id)}
+				<Button variant="destructive" on:click={() => deleteTag(tag)}>
+					Delete: {renderTagWhitespace(tag)}
+				</Button>
+			{/each}
+		{:else}
+			No orphan tags found
+		{/if}
+	{/await}
+</div>
+
+<div class="border rounded my-3 p-2">
+	<h3 class="text-xl flex gap-1 items-center">
+		Similar Tags
+		{#if similarTags?.length == 0}
+			<CheckCircle class="text-green-500 w-4 h-4" />
+		{/if}
+	</h3>
+	<input type="range" min="0" max="100" bind:value={similarityThreshold} />
+	{similarityThreshold}%
+	<table>
+		<thead>
+			<th>Key</th>
+			<th />
+			<th>Matches</th>
+		</thead>
+		<tbody>
+			{#each similarTags.sort((m, n) => m.name.localeCompare(n.name)) as t}
+				<tr>
+					<td>
+						{t.name.replaceAll(' ', '_')}
+					</td>
+					<td
+						><Button
+							on:click={() => {
+								mergeAllTags(t);
+							}}
+						>
+							<ArrowLeft class="w-4 h-4 mr-1" /> Merge into
+						</Button>
+					</td>
+					<td>
+						<!-- {#each t.tags as j} -->
+						{t.tags.map((t) => renderTagWhitespace(t)).join(', ')}
+						<!-- {/each} -->
+					</td>
+				</tr>
+			{/each}
+		</tbody>
+	</table>
+</div>

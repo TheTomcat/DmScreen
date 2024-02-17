@@ -1,13 +1,9 @@
 <script lang="ts">
 	import { Input } from '$lib/components/ui/input';
 	import * as DataTable from '$lib/components/ui/datatable';
-
-	// import type { AnyPlugins } from "svelte-headless-table/lib/types/TablePlugin";
-	// import type { Task } from "../(data)/schemas";
 	import type { TableViewModel } from 'svelte-headless-table';
 	import { Button } from '$lib/components/ui/button';
 	import { Cross, GalleryHorizontalEnd } from 'lucide-svelte';
-	// import { statuses, priorities } from "../(data)/data";
 	import type { Writable } from 'svelte/store';
 	import type { Collection, ImageType, ImageURL } from '../../../../app';
 
@@ -16,7 +12,6 @@
 	import { imageTypes } from './data';
 
 	import * as Dialog from '$lib/components/ui/dialog';
-	import * as Card from '$lib/components/ui/card';
 	import CollectionSelectionBox from '$lib/components/new/CollectionSelectionBox.svelte';
 	import Label from '$lib/components/ui/label/label.svelte';
 	import { createEventDispatcher } from 'svelte';
@@ -65,11 +60,6 @@
 			title="Image Type"
 			options={imageTypes}
 		/>
-		<!-- <DataTableFacetedFilter
-			bind:filterValues={$filterValues.priority}
-			title="Priority"
-			options={priorities} -->
-		<!-- /> -->
 		{#if showReset}
 			<Button
 				on:click={() => {
@@ -85,7 +75,8 @@
 		{/if}
 	</div>
 	<div class="flex-1 text-sm text-muted-foreground text-right">
-		{$selection.length} entities selected.
+		{$selection.length}
+		{plural($selection.length, 'image')} selected.
 
 		<Dialog.Root bind:open>
 			<Dialog.Trigger>

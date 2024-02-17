@@ -25,6 +25,7 @@
 		Shield,
 		Skull,
 		SwordsIcon,
+		Trash2,
 		X
 	} from 'lucide-svelte';
 	import type { Participant, Entity, Combat } from '../../app';
@@ -38,7 +39,7 @@
 	import type { wsController } from '$lib/ws';
 	import Autocomplete from './Autocomplete.svelte';
 	import EditableText from './EditableText.svelte';
-	import Dialog2 from './Dialog.svelte';
+
 	import { entityHasData, parseAndCreateCounters } from '$lib/jsonschema';
 	import Statblock from './new/EntityDisplay/Statblock.svelte';
 
@@ -69,8 +70,6 @@
 	let conditionsChanged: boolean = false;
 	let conditionToAdd: string = '';
 	let conditions: string[] = [];
-
-	let newCombatantDialog: Dialog2;
 
 	let entities: Entity[] = [];
 	let statblockParticipant: Participant;
@@ -239,9 +238,12 @@
 			<!-- <Table.Head /> -->
 			<Table.Head />
 			<Table.Head />
-			<Table.Head>Name</Table.Head>
-			<Table.Head>Conditions</Table.Head>
+			<Table.Head>
+				Name
+				<Button class="p-2 ml-1 h-8" variant="outline">Smart Name</Button>
+			</Table.Head>
 			<Table.Head class="flex justify-center items-center"><Droplets color="red" /></Table.Head>
+			<Table.Head>Conditions</Table.Head>
 			<Table.Head />
 		</Table.Row>
 	</Table.Header>
@@ -351,27 +353,12 @@
 							/>
 						</span>
 					</Table.Cell>
-					<Table.Cell
-						on:click={() => {
-							showConditionsDialog(participant);
-						}}
-					>
-						<div style="display:flex; justify-content: start; gap: var(--size-3)">
-							<button style="padding-block: 0"><Pencil /></button>
-							{#if is_dead(participant)}<div class="icon">
-									<Skull />
-								</div>
-							{/if}
-							{participant.conditions.split(',').join(', ')}
-							<!-- {#each participant.conditions.split(',') as condition}{condition}{/each} -->
-						</div>
-					</Table.Cell>
-
-					<Table.Cell style="display: flex; justify-content: center; max-inline-size: unset;">
-						<div class="grid grid-cols-[1fr,2fr,1fr] gap-1">
+					<Table.Cell class="flex justify-center">
+						<div class="grid grid-cols-[1fr,3fr,1fr] gap-1">
 							<Button
 								bind:el={refs[i]}
 								variant="ghost"
+								class="h-8 m-0 p-2"
 								on:click={() => showDamagingDialog(true, participant, refs[i])}
 							>
 								<SwordsIcon class="h-4 w-4" color={'red'} />
@@ -405,6 +392,7 @@
 							</div>
 							<Button
 								variant="ghost"
+								class="h-8 m-0 p-2"
 								on:click={() => showDamagingDialog(false, participant, refs[i])}
 							>
 								<CrossIcon class="w-4 h-4" color={'green'} />
@@ -412,9 +400,27 @@
 						</div>
 					</Table.Cell>
 					<Table.Cell>
+						<div class="flex justify-start gap-2">
+							<Button
+								on:click={() => {
+									showConditionsDialog(participant);
+								}}
+								class="h-8 m-0 p-2"
+								variant="outline"><Pencil class="w-4 h-4" /></Button
+							>
+							{#if is_dead(participant)}<div class="icon">
+									<Skull />
+								</div>
+							{/if}
+							{participant.conditions.split(',').join(', ')}
+							<!-- {#each participant.conditions.split(',') as condition}{condition}{/each} -->
+						</div>
+					</Table.Cell>
+
+					<Table.Cell>
 						<Button
 							variant="ghost"
-							class="p-1"
+							class="h-8 m-0 p-2"
 							on:click={() => {
 								if ($combat?.active_participant_id == participant.participant_id) {
 									let p = get_next_alive_participant_id(
@@ -432,7 +438,7 @@
 								}
 							}}
 						>
-							<X />
+							<Trash2 class="w-4 h-4" />
 						</Button>
 					</Table.Cell>
 				</tr>
@@ -587,22 +593,6 @@
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
-<!-- <div slot="header">
-	</div>
-	<div slot="content">
-		
-	</div>
-	<div slot="menu">
-	</div>
-</Dialog> -->
-
-<Dialog2 mode="mega" showMenu={false} bind:this={newCombatantDialog}>
-	<div slot="header">
-		<PlusSquare />
-		<h5>Quick-Add Combatant</h5>
-	</div>
-	<div slot="content" />
-</Dialog2>
 
 <style>
 	/* table.inactive * {

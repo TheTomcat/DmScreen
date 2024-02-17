@@ -1,13 +1,12 @@
 <script lang="ts">
 	import { sort_participants_by_id } from '$lib';
-	import { combat, playerStateStore, type wsController } from '$lib/ws';
+	import { playerStateStore, type wsController } from '$lib/ws';
 	import { Cross } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
 	import type { RollMode } from '../../../app';
 
 	import HitPointRow from './HitPointRow.svelte';
-	import * as Select from '$lib/components/ui/select';
 	import DiceRollTypeSelect from '../DiceRollTypeSelect.svelte';
 
 	export let controller: wsController;
@@ -16,6 +15,17 @@
 
 	let rollModePC: RollModeSet; //; label: string };
 	let rollModeNPC: RollModeSet; //; label: string };
+
+	// let modifiedHPs: {
+	// 	participant_id: number;
+	// 	hit_points: number;
+	// 	damage: number;
+	// }[] = [];
+
+	// const pushHPUpdate = () => {
+	// 	if (!$playerStateStore.combat?.combat_id) return;
+	// 	controller.updateParticipants($playerStateStore.combat?.combat_id, modifiedHPs);
+	// };
 
 	const onUpdateHitpoints = (
 		e: CustomEvent<{ participant_id: number; max_hp: number; damage: number }>

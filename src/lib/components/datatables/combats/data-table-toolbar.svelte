@@ -48,7 +48,7 @@
 	}: {
 		filterValues: Writable<{
 			participantNames: string[];
-			numParticipants: [number | undefined, number | undefined];
+			num_participants: [number | null, number | null];
 		}>;
 	} = pluginStates.colFilter;
 
@@ -73,14 +73,14 @@
 			title="Select Participants..."
 			bind:options={$filterValues.participantNames}
 		/>
-		<!-- <DataTableRange bind:filterValues={$filterValues.numParticipants} title="Range" /> -->
+		<DataTableRange bind:filterValues={$filterValues.num_participants} title="Participants..." />
 
 		{#if showReset}
 			<Button
 				on:click={() => {
 					$filterValue = '';
 					$filterValues.participantNames = [];
-					$filterValues.numParticipants = [undefined, undefined];
+					$filterValues.num_participants = [null, null];
 				}}
 				variant="ghost"
 				class="h-8 px-2 lg:px-3"
@@ -91,7 +91,8 @@
 		{/if}
 	</div>
 	<div class="flex-1 text-sm text-muted-foreground text-right">
-		{$selection.length} entities selected.
+		{$selection.length}
+		{plural($selection.length, 'combat')} selected.
 	</div>
 	<Button
 		class="ml-2 h-8 px-2 lg:px-3"

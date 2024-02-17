@@ -30,6 +30,7 @@
 	import CollectionSelectionBox from '$lib/components/new/CollectionSelectionBox.svelte';
 	import { toast } from 'svelte-sonner';
 	import type { wsController } from '$lib/ws';
+	// import DataTable from '../images/data-table.svelte';
 	// type imageType = (typeof imageTypes)[number]['value'];
 
 	// let data: ImageURL[] = [];
@@ -51,24 +52,37 @@
 		page: number = 0,
 		perPage: number = 20,
 		q: string,
-		combat_participants_name: string
-		// num_participants: [number | undefined, number | undefined]
+		combat_participants_name: string,
+		num_participants: [number | null, number | null]
 	) => {
 		// console.log('Getting ', { name: entityFilter, page, is_PC: showPCs });
+		let query: {
+			page: number;
+			size: number;
+			title: string;
+			combat_participants_name: string;
+			sort_by: string;
+			sort_dir: 'asc' | 'desc';
+			combat_participants_at_most?: number;
+			combat_participants_at_least?: number;
+		} = {
+			page: page + 1,
+			size: perPage,
+			title: q,
+			combat_participants_name,
+			sort_by: $sortKeys[0].id,
+			sort_dir: $sortKeys[0].order
+		};
+		if (num_participants[0])
+			query = { ...query, combat_participants_at_least: num_participants[0] };
+		if (num_participants[1]) query = { ...query, combat_participants_at_most: num_participants[1] };
+		// combat_participants_at_most: num_participants[1]
+
 		return client
 			.GET('/combat/', {
 				params: {
-					query: {
-						page: page + 1,
-						size: perPage,
-						title: q,
-						combat_participants_name,
-						//@ts-ignore
-						sort_by: $sortKeys[0].id,
-						sort_dir: $sortKeys[0].order
-						// combat_participants_at_least: num_participants[0],
-						// combat_participants_at_most: num_participants[1]
-					}
+					//@ts-ignore
+					query
 				}
 			})
 			.then((response) => {
@@ -95,12 +109,13 @@
 		select: addSelectedRows({}),
 		colFilter: addColumnFilters({ serverSide: true }),
 		hidden: addHiddenColumns({
-			initialHiddenColumnIds: ['numParticipants']
+			initialHiddenColumnIds: []
 		}),
 		sort: addSortBy({
 			serverSide: true,
 			disableMultiSort: true,
-			initialSortKeys: [{ id: 'title', order: 'asc' }]
+			initialSortKeys: [{ id: 'title', order: 'asc' }],
+			toggleOrder: ['asc', 'desc']
 		})
 	});
 
@@ -132,15 +147,17 @@
 		table.column({
 			accessor: ({ participants }) => participants,
 			header: 'Num Participants',
-			id: 'numParticipants',
-
+			id: 'num_participants',
+			cell: ({ value }) => {
+				return render_participants(value);
+			},
 			plugins: {
 				colFilter: {
 					fn: ({ filterValue, value }) => {
 						console.log(filterValue, value);
 						return true;
 					},
-					initialFilterValue: [1, 20],
+					initialFilterValue: [null, null],
 					render: ({ filterValue }) => {
 						console.log(get(filterValue));
 						return get(filterValue);
@@ -151,7 +168,7 @@
 
 		table.column({
 			accessor: ({ participants }) => participants,
-			header: 'Num Participants',
+			header: 'Participant Names',
 			id: 'participantNames',
 			cell: ({ value }) => {
 				return render_participants(value);
@@ -203,7 +220,7 @@
 	}: {
 		filterValues: Writable<{
 			participantNames: string[];
-			numParticipants: [number | undefined, number | undefined];
+			num_participants: [number | null, number | null];
 		}>;
 	} = pluginStates.colFilter;
 
@@ -217,16 +234,17 @@
 		if (
 			browser &&
 			$filterValues &&
-			$filterValues.participantNames !== undefined
-			// $filterValues.numParticipants !== undefined
+			$filterValues.participantNames !== undefined &&
+			$filterValues.num_participants !== undefined
 		) {
 			// console.log($pageIndex, $pageSize);
+			$sortKeys;
 			getCombats(
 				$pageIndex,
 				$pageSize,
 				$filterValue,
-				$filterValues.participantNames.join('|')
-				// $filterValues.numParticipants
+				$filterValues.participantNames.join('|'),
+				$filterValues.num_participants || [null, null]
 			);
 		}
 	}
@@ -248,9 +266,14 @@
 			$hiddenColumnIds = $hiddenColumnIds.filter((s) => s !== 'selectCombat');
 		}
 	}
+
+	onMount(() => {
+		$hiddenColumnIds = ['participantNames'];
+	});
 </script>
 
-{JSON.stringify($sortKeys)}
+<!-- {JSON.stringify($sortKeys)}
+{JSON.stringify($filterValues)} -->
 <div class="space-y-4">
 	<DataTableToolbar {tableModel} selection={selection.selectedDataIDs} on:newCombat={newCombat} />
 
@@ -261,9 +284,15 @@
 					<Subscribe rowAttrs={headerRow.attrs()}>
 						<Table.Row>
 							{#each headerRow.cells as cell (cell.id)}
-								<Subscribe attrs={cell.attrs()} let:attrs props={cell.props()}>
+								<Subscribe attrs={cell.attrs()} let:attrs props={cell.props()} let:props>
 									<Table.Head {...attrs} class="[&:has([role=checkbox])]:pl-3">
-										<Render of={cell.render()} />
+										{#if cell.id == 'title' || cell.id == 'num_participants'}
+											<DataTable.HeadingSort {props}>
+												<Render of={cell.render()} />
+											</DataTable.HeadingSort>
+										{:else}
+											<Render of={cell.render()} />
+										{/if}
 									</Table.Head>
 								</Subscribe>
 							{/each}

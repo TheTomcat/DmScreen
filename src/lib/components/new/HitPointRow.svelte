@@ -41,13 +41,10 @@
 	};
 
 	export const setRollMode = (newRollMode: RollModeSet) => {
-		// console.log(participant.participant_id, newRollMode);
 		rollMode = newRollMode;
 		roll_hp();
 	};
 </script>
-
-<!-- <div class="initrow"> -->
 
 {#if participant.hit_dice}
 	<Table.Cell>{participant.name} ({participant.hit_dice})</Table.Cell>
@@ -56,7 +53,7 @@
 {/if}
 <Table.Cell>
 	<div class="flex gap-2">
-		<Input class="w-[100px]" bind:value={participant.damage} type="number" on:change={onHPChange} />
+		<Input class="w-[100px]" bind:value={participant.damage} type="number" on:blur={onHPChange} />
 		<Button
 			variant="outline"
 			on:click={() => {
@@ -75,23 +72,7 @@
 	<div class="flex gap-2">
 		{#if participant.hit_dice}
 			<DiceRollTypeSelect bind:value={rollMode} on:change={roll_hp} />
-			<!-- <select bind:value={rollMode} on:change={roll_hp}>
-			<option value="one">1</option>
-			<option value="min">Min</option>
-			<option value="default">Default</option>
-			<option value="random">Roll</option>
-			<option value="max">Max</option>
-			<option value="Set">Set</option>
-		</select> -->
 		{/if}
-		<Input class="w-[100px]" bind:value={participant.max_hp} type="number" on:change={onHPChange} />
+		<Input class="w-[100px]" bind:value={participant.max_hp} type="number" on:blur={onHPChange} />
 	</div>
 </Table.Cell>
-
-<!-- </div> -->
-
-<style>
-	.initroller {
-		width: var(--size-9);
-	}
-</style>

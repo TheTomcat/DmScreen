@@ -3,6 +3,7 @@ import Pagination from "./data-table-pagination.svelte";
 import FacetedFilter from "./data-table-faceted-filter.svelte";
 import Checkbox from "./data-table-checkbox.svelte"
 import FreetextFilter from './data-table-freetext-filter.svelte'
+import HeadingSort from "./data-table-heading-sort.svelte";
 import { type selectType, createSelection } from "./data-table";
 
 
@@ -11,6 +12,7 @@ export {
     FacetedFilter,
     Checkbox,
     FreetextFilter,
+    HeadingSort,
     // Dialog,
     // Empty,
     // Group,
@@ -26,6 +28,7 @@ export {
     FacetedFilter as DataTableFacetedFilter,
     Checkbox as DataTableCheckbox,
     FreetextFilter as DataTableFreetextFilter,
+    HeadingSort as DataTableHeadingSort,
     // Dialog as CommandDialog,
     // Empty as CommandEmpty,
     // Group as CommandGroup,

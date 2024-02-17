@@ -203,6 +203,41 @@ export function makeCancelable<T>(promise: Promise<T>) {
     };
 };
 
+
+export const decodeCR = (cr_DB: number | null | undefined): string | undefined => {
+    if (!cr_DB) return undefined
+    let cr_int = Math.floor(cr_DB)
+    if (cr_int == cr_DB) {
+        return `${cr_int}`
+    }
+    if (0 < cr_DB && cr_DB < 1) {
+        let cr_inverse = Math.floor(1 / cr_DB)
+        if ([2, 4, 8].includes(cr_inverse)) {
+            return `1/${cr_inverse}`
+        }
+    }
+    return undefined
+}
+
+export const encodeCR = (cr_str: string | null | undefined): number | undefined => {
+    if (!cr_str) return undefined
+
+    switch (cr_str) {
+        case "1/8":
+            return 0.125
+        case "1.4":
+            return 0.25
+        case "1/2":
+            return 0.5
+        default:
+            if (cr_str == `${parseInt(cr_str)}`) {
+                return parseInt(cr_str)
+            }
+            return undefined
+    }
+}
+
+
 export const logc = (handle: Function) => {
     const f = ({ args }: any) => {
         console.log(args);

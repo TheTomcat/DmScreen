@@ -1,4 +1,4 @@
-import { capitalise, renderModifier } from "$lib"
+import { capitalise, decodeCR, encodeCR, renderModifier } from "$lib"
 import type { Combat, Entity, Participant } from "../app"
 import { createCounter, makeCounterID } from "./stores/counterStore"
 
@@ -97,7 +97,7 @@ export type Creature = {
     page: number,
     otherSources?: { source: string }[],
     size: Size,
-    type: string | { type: string, tags?: string[], swarmSize?: Size },
+    type?: string | { type: string, tags?: string[], swarmSize?: Size },
     alignment: (string | { alignment: string[], chance: number })[],
     ac: (number | { ac: number, from?: string[], condition?: string, [other: string]: any })[],
     hp: { average: number, formula: string },
@@ -297,7 +297,7 @@ export const renderSize = (c: Creature): string => {
 };
 
 export const renderType = (c: Creature): string => {
-    console.log(c)
+    if (!c.type) return '';
     if (typeof c.type == 'string') {
         return c.type;
     }
@@ -305,14 +305,17 @@ export const renderType = (c: Creature): string => {
 };
 
 export const renderCR = (c: Creature): string => {
+    if (!c.cr) return ''
     return typeof c.cr == 'string' ? c.cr : c.cr.cr;
 };
 
 export const renderHP = (c: Creature): string => {
+    if (!c.hp) return ''
     return `${c.hp.average} (${c.hp.formula})`;
 };
 
 export const renderAC = (c: Creature): string => {
+    if (!c.ac) return ''
     return c.ac
         .map((ac) => {
             if (typeof ac == 'number') return `${ac}`;
@@ -321,6 +324,12 @@ export const renderAC = (c: Creature): string => {
             return `${ac.ac}`;
         })
         .join(', ');
+};
+export const extractAC = (c: Creature): number => {
+    if (!c.ac) return 0
+    let ac = c.ac[0];
+    if (typeof ac == 'number') return ac;
+    return ac.ac
 };
 export const renderSaves = (c: Creature): string => {
     let output: string[] = [];
@@ -346,6 +355,7 @@ export const renderSkills = (c: Creature): string => {
     return output.join(', ');
 };
 export const renderSpeed = (c: Creature): string => {
+    if (!c.speed) return ''
     let output: string[] = [];
     // if (!c.speed) return '';
     let i;
@@ -591,6 +601,38 @@ export const parseAndCreateCounters = (participants: Participant[], entities: En
             })
         }
     })
+}
+
+export const parseJSONToEntity = (json: string | object): Omit<Entity, 'entity_id'> | undefined => {
+    let obj: Creature;
+    if (typeof json == 'string') {
+
+        obj = JSON.parse(json);
+
+    } else {
+        obj = json as Creature;
+    }
+    try {
+
+        let entity: Omit<Entity, 'entity_id'> = {
+            name: obj.name,
+            image_id: undefined,
+            is_PC: false,
+            hit_dice: obj.hp.formula,
+            ac: extractAC(obj),
+            cr: encodeCR(renderCR(obj)),
+            initiative_modifier: obj.dex,
+            source: obj.source,
+            source_page: obj.page,
+            //@ts-ignore
+            data: obj,
+            // entity_id: undefined,
+        };
+        console.log("OK")
+        return entity;
+    } catch {
+        return undefined;
+    }
 }
 
 const creatures: Creature[] = [

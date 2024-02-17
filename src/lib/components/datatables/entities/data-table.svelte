@@ -7,7 +7,9 @@
 		addPagination,
 		addTableFilter,
 		addSelectedRows,
-		addColumnFilters
+		addColumnFilters,
+		addSortBy,
+		addHiddenColumns
 	} from 'svelte-headless-table/plugins';
 	// import DataTableCheckbox from './data-table-checkbox.svelte';
 
@@ -23,6 +25,7 @@
 	import DataTableImage from './data-table-image.svelte';
 	import DataTableMetadata from './data-table-metadata.svelte';
 	import DataTableData from './data-table-data.svelte';
+	import { decodeCR } from '$lib';
 
 	const dataStore = writable<Entity[]>([]);
 	const totalCount = writable<number>(1);
@@ -36,7 +39,8 @@
 		pc: pcType[],
 		hasImage: hasImageType[],
 		hasData: hasDataType[],
-		crs: CRType[]
+		crs: CRType[],
+		sources: string[]
 	) => {
 		let is_PC: boolean | undefined =
 			pc.length == 0 || pc.length == 2 ? undefined : pc.includes('pc');
@@ -47,13 +51,25 @@
 		let has_data: boolean | undefined =
 			hasData.length == 0 || hasData.length == 2 ? undefined : hasData.includes('data');
 		let cr = crs.length == 0 ? undefined : crs.join('|');
+		let source = sources.length == 0 ? undefined : sources.join('|');
 		// hasData == 'data' ? true : hasData == 'nodata' ? false : undefined;
 		// let has_image: boolean | undefined =
 		// hasimage === 'pc,npc' ? undefined : pc === 'pc' ? true : pc === 'npc' ? false : undefined;
 		return client
 			.GET('/entity/', {
 				params: {
-					query: { page: page + 1, size, name, is_PC, has_image, has_data, cr }
+					query: {
+						page: page + 1,
+						size,
+						name,
+						is_PC,
+						has_image,
+						has_data,
+						cr,
+						source,
+						sort_by: $sortKeys[0].id as 'name' | 'ac' | 'cr' | 'initiative' | null,
+						sort_dir: $sortKeys[0].order
+					}
 				}
 			})
 			.then((response) => {
@@ -77,7 +93,14 @@
 			// }
 		}),
 		select: addSelectedRows({}),
-		colFilter: addColumnFilters({ serverSide: true })
+		colFilter: addColumnFilters({ serverSide: true }),
+		sort: addSortBy({
+			serverSide: true,
+			disableMultiSort: true,
+			initialSortKeys: [{ id: 'name', order: 'asc' }],
+			toggleOrder: ['asc', 'desc']
+		}),
+		hide: addHiddenColumns({ initialHiddenColumnIds: ['seq'] })
 		// col2Filter: addColumnFilters()
 	});
 
@@ -120,7 +143,13 @@
 		table.column({
 			accessor: ({ cr }) => cr,
 			header: 'CR',
-			id: 'cr'
+			id: 'cr',
+			cell: ({ value }) => decodeCR(value) || ''
+		}),
+		table.column({
+			accessor: ({ ac }) => ac,
+			header: 'AC',
+			id: 'ac'
 		}),
 		// table.column({
 		// 	accessor: ({ image_id }) => {
@@ -175,6 +204,18 @@
 			// 		initialFilterValue: 'pc'
 			// 	}
 			// }
+		}),
+		table.column({
+			accessor: ({ source, source_page }) => {
+				return { source, source_page };
+			},
+			header: 'Source',
+			id: 'source',
+			cell: ({ value }) => (value.source ? `${value.source} p${value.source_page}` : '')
+		}),
+		table.column({
+			header: 'Seq',
+			accessor: 'seq'
 		})
 	]);
 
@@ -193,6 +234,7 @@
 			hasImage: hasImageType[];
 			hasData: hasDataType[];
 			cr: CRType[];
+			source: string[];
 		}>;
 	} = pluginStates.colFilter;
 
@@ -205,6 +247,8 @@
 	// 	}>;
 	// } = pluginStates.col2Filter;
 
+	const { sortKeys } = pluginStates.sort;
+
 	const { selectedDataIds } = pluginStates.select;
 
 	$: {
@@ -214,10 +258,11 @@
 			$filterValues.pc &&
 			$filterValues.hasData &&
 			$filterValues.hasImage &&
-			$filterValues.cr
+			$filterValues.cr &&
+			$filterValues.source
 		) {
 			//&& $filterValues && $filterValues.pc) {
-
+			$sortKeys;
 			getEntities(
 				$pageIndex,
 				$pageSize,
@@ -225,7 +270,8 @@
 				$filterValues.pc,
 				$filterValues.hasImage,
 				$filterValues.hasData,
-				$filterValues.cr
+				$filterValues.cr,
+				$filterValues.source
 			);
 		}
 	}
@@ -240,9 +286,15 @@
 					<Subscribe rowAttrs={headerRow.attrs()}>
 						<Table.Row>
 							{#each headerRow.cells as cell (cell.id)}
-								<Subscribe attrs={cell.attrs()} let:attrs props={cell.props()}>
+								<Subscribe attrs={cell.attrs()} let:attrs props={cell.props()} let:props>
 									<Table.Head {...attrs} class="[&:has([role=checkbox])]:pl-3">
-										<Render of={cell.render()} />
+										{#if cell.id == 'name' || cell.id == 'id' || cell.id == 'cr' || cell.id == 'ac' || cell.id == 'source'}
+											<DataTable.HeadingSort {props}>
+												<Render of={cell.render()} />
+											</DataTable.HeadingSort>
+										{:else}
+											<Render of={cell.render()} />
+										{/if}
 									</Table.Head>
 								</Subscribe>
 							{/each}
