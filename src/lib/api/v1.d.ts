@@ -731,10 +731,10 @@ export interface components {
       /** Pages */
       pages?: number | null;
     };
-    /** Page[RollTable] */
-    Page_RollTable_: {
+    /** Page[RollTableDB] */
+    Page_RollTableDB_: {
       /** Items */
-      items: components["schemas"]["RollTable"][];
+      items: components["schemas"]["RollTableDB"][];
       /** Total */
       total: number | null;
       /** Page */
@@ -914,24 +914,45 @@ export interface components {
       /** Participant Id */
       participant_id: number;
     };
-    /** RollTable */
-    RollTable: {
+    /** RollTableCreate */
+    RollTableCreate: {
+      /** Name */
+      name: string;
+      /**
+       * Rows
+       * @default []
+       */
+      rows?: components["schemas"]["RollTableRowCreate"][];
+    };
+    /** RollTableDB */
+    RollTableDB: {
       /** Name */
       name: string;
       /** Rows */
-      rows: components["schemas"]["RollTableRow"][];
+      rows: components["schemas"]["RollTableRowDB"][];
       /** Rolltable Id */
       rolltable_id: number;
     };
-    /** RollTableBase */
-    RollTableBase: {
+    /** RollTableRowCreate */
+    RollTableRowCreate: {
       /** Name */
       name: string;
-      /** Rows */
-      rows: components["schemas"]["RollTableRowBase"][];
+      /** Display Name */
+      display_name: string;
+      /**
+       * Weight
+       * @default 1
+       */
+      weight?: number;
+      /** Category */
+      category?: string | null;
+      /** Extra Data */
+      extra_data?: components["schemas"]["RollTableRowData"][] | null;
+      /** Rolltable Id */
+      rolltable_id: number;
     };
-    /** RollTableRow */
-    RollTableRow: {
+    /** RollTableRowDB */
+    RollTableRowDB: {
       /** Name */
       name: string;
       /** Display Name */
@@ -947,22 +968,8 @@ export interface components {
       extra_data?: components["schemas"]["RollTableRowData"][] | null;
       /** Rolltable Row Id */
       rolltable_row_id: number;
-    };
-    /** RollTableRowBase */
-    RollTableRowBase: {
-      /** Name */
-      name: string;
-      /** Display Name */
-      display_name: string;
-      /**
-       * Weight
-       * @default 1
-       */
-      weight?: number;
-      /** Category */
-      category?: string | null;
-      /** Extra Data */
-      extra_data?: components["schemas"]["RollTableRowData"][] | null;
+      /** Rolltable Id */
+      rolltable_id: number;
     };
     /** RollTableRowData */
     RollTableRowData: {
@@ -987,7 +994,7 @@ export interface components {
       /** Name */
       name?: string | null;
       /** Rows */
-      rows?: components["schemas"]["RollTableRowUpdate"][] | null;
+      rows?: ((components["schemas"]["RollTableRowUpdate"] | components["schemas"]["RollTableRowCreate"])[]) | null;
     };
     /**
      * SortOption
@@ -1593,7 +1600,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["Page_RollTable_"];
+          "application/json": components["schemas"]["Page_RollTableDB_"];
         };
       };
       /** @description Validation Error */
@@ -1611,14 +1618,14 @@ export interface operations {
   create_rolltable: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["RollTableBase"];
+        "application/json": components["schemas"]["RollTableCreate"];
       };
     };
     responses: {
       /** @description Successful Response */
       201: {
         content: {
-          "application/json": components["schemas"]["RollTable"];
+          "application/json": components["schemas"]["RollTableDB"];
         };
       };
       /** @description Conflict Error */
@@ -1647,7 +1654,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["RollTable"];
+          "application/json": components["schemas"]["RollTableDB"];
         };
       };
       /** @description RollTable not found */
@@ -1700,7 +1707,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["RollTable"];
+          "application/json": components["schemas"]["RollTableDB"];
         };
       };
       /** @description Validation Error */

@@ -30,8 +30,12 @@ type ParticipantUpdate = components['schemas']['ParticipantUpdate'];
 type Combat = components['schemas']['Combat'];
 type Session = components['schemas']['Session'];
 type Collection = components['schemas']['Collection'];
-type RollTable = components['schemas']['RollTable'];
-type RollTableRow = components['schemas']['RollTableRow'];
+type RollTable = components['schemas']['RollTableDB'];
+type RollTableRow = components['schemas']['RollTableRowDB'];
+type RollTableUpdate = components['schemas']['RollTableUpdate'];
+type RollTableCreate = components['schemas']['RollTableCreate'];
+
+type RollTableBase = components['schemas']['RollTableBase'];
 
 export type _ImageMatch = {
 	image: Image;
