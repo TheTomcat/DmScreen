@@ -139,7 +139,7 @@
 	</div>
 </div>
 
-<div class="grid grid-cols-[auto_1fr_auto]">
+<div class="grid grid-cols-[auto_1fr_auto] gap-2 items-center">
 	{#each presets as preset (preset.key)}
 		<Button
 			on:click={() => {
@@ -175,12 +175,13 @@
 				.join(', ')}
 		</div>
 		<Button
+			variant="destructive"
 			on:click={() => {
 				deletePreset(preset.key);
 				presets = presets.filter((p) => p.key !== preset.key);
 			}}
 		>
-			<Trash2 class="h-2 w-4 mr-1" />Delete Preset
+			<Trash2 class="h-4 w-4 mr-1" />Delete Preset
 		</Button>
 	{/each}
 </div>

@@ -27,21 +27,30 @@
 	import * as Popover from '$lib/components/ui/popover';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Switch } from '$lib/components/ui/switch';
+	import { get, writable } from 'svelte/store';
+
+	import { announcement, isAnnouncing, awaitingCancel } from '$lib/announcement';
+
+	export let ws: wsController;
 
 	let announceTimer = tweened(100);
 
-	export let ws: wsController;
+	let announcePromise: ReturnType<typeof makeCancelable<void>>;
+	// let announcement = writable(''); //: string;
+	let autoClearAnnoucement: boolean = false;
+	// let isAnnouncing = writable(false);
+	// let awaitingCancel = writable(false);
 
 	let announce = () => {
 		if (autoClearAnnoucement) {
 			ws.announce({
-				message: announcement,
+				message: $announcement,
 				timeout: $playerStateStore.announce_timeout,
 				display: true
 			});
 		} else {
 			ws.announce({
-				message: announcement,
+				message: $announcement,
 				timeout: $playerStateStore.announce_timeout,
 				display: true
 			});
@@ -51,36 +60,37 @@
 		}
 	};
 	let handleAnnounce = () => {
-		if (!isAnnouncing) {
-			isAnnouncing = true;
+		if (!get(isAnnouncing)) {
+			// isAnnouncing = true;
+			isAnnouncing.set(true);
 			announce();
 			if (autoClearAnnoucement) {
-				awaitingCancel = true;
+				// awaitingCancel = true;
+				awaitingCancel.set(true);
 				announceTimer.set(100, { duration: 0 });
 				announcePromise = makeCancelable<void>(
 					announceTimer.set(0, { duration: $playerStateStore.announce_timeout })
 				);
 				announcePromise.promise.then(() => {
 					clearAnnouncement();
-					isAnnouncing = false;
-					awaitingCancel = false;
+					// isAnnouncing = false;
+					isAnnouncing.set(false);
+					// awaitingCancel = false;
+					awaitingCancel.set(false);
 				});
 			}
 		} else {
 			if (announcePromise) announcePromise.cancel();
 			clearAnnouncement();
-			isAnnouncing = false;
-			awaitingCancel = false;
+			// isAnnouncing = false;
+			isAnnouncing.set(false);
+			// awaitingCancel = false;
+			awaitingCancel.set(false);
 		}
 	};
 	let clearAnnouncement = () => {
 		ws.clearAnnouncement();
 	};
-	let announcePromise: ReturnType<typeof makeCancelable<void>>;
-	let announcement: string;
-	let autoClearAnnoucement: boolean = false;
-	let isAnnouncing = false;
-	let awaitingCancel = false;
 
 	let annoucementPopoverOpen: boolean = false;
 </script>
@@ -91,14 +101,14 @@
 	<Popover.Root portal={null} bind:open={annoucementPopoverOpen}>
 		<Tooltip.Root>
 			<Tooltip.Trigger asChild let:builder={builder2}>
-				{#if isAnnouncing}
+				{#if $isAnnouncing}
 					<Button builders={[builder2]} variant="outline" class="w-32" on:click={handleAnnounce}>
 						<div class="flex flex-col w-full">
 							<div class="flex flex-row justify-center">
 								<MegaphoneOff class="w-4 h-4 mr-2" />
 								Clear
 							</div>
-							{#if awaitingCancel}
+							{#if $awaitingCancel}
 								<div class="w-full bg-gray-200 rounded-full h-0.5 dark:bg-gray-700">
 									<div class="bg-blue-600 h-0.5 rounded-full" style="width: {$announceTimer}%" />
 								</div>
@@ -112,19 +122,19 @@
 							variant="outline"
 							class="w-32"
 							on:click={(e) => {
-								if (isAnnouncing) {
+								if ($isAnnouncing) {
 									e.preventDefault();
 									handleAnnounce();
 								}
 							}}
 						>
-							{#if isAnnouncing}
+							{#if $isAnnouncing}
 								<div class="flex flex-col w-full">
 									<div class="flex flex-row justify-center">
 										<MegaphoneOff class="w-4 h-4 mr-2" />
 										Clear
 									</div>
-									{#if awaitingCancel}
+									{#if $awaitingCancel}
 										<div class="w-full bg-gray-200 rounded-full h-0.5 dark:bg-gray-700">
 											<div
 												class="bg-blue-600 h-0.5 rounded-full"
@@ -153,7 +163,7 @@
 				<div class="grid gap-2">
 					<div class="grid grid-cols-3 items-center gap-4">
 						<Input
-							bind:value={announcement}
+							bind:value={$announcement}
 							on:keydown={(e) => {
 								if (e.key == 'Enter') {
 									handleAnnounce();

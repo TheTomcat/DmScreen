@@ -165,8 +165,9 @@
 				</div>
 			{/if}
 		</div>
+		<!-- <div class="flex justify-between w-full"> -->
 		<Input
-			class="name w-full"
+			class="cname w-full col-span-3"
 			placeholder="Image Name"
 			data-form-type="other"
 			bind:value={image.name}
@@ -175,6 +176,7 @@
 			}}
 		/>
 		<ImageTypeSelectBox
+			class="ctype col-span-1"
 			selected={image.type}
 			onSelectedChange={(e) => {
 				console.log(e);
@@ -183,6 +185,7 @@
 				setType(e.value);
 			}}
 		/>
+		<!-- </div> -->
 		<!-- <select class="type" value={image.type} on:change={handleChange}>
 			{#each imageTypes as type}
 				<option value={type}>{capitalise(type)}</option>
@@ -283,12 +286,12 @@
 		/* padding-block: var(--size-3); */
 		margin-block: var(--size-2);
 	}
-	.name {
+	.cname {
 		grid-area: name;
 		padding: var(--size-3);
 		background-color: var(--surface-4);
 	}
-	.type {
+	.ctype {
 		grid-area: type;
 		background-color: var(--surface-4);
 	}

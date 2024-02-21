@@ -19,10 +19,12 @@
 		ImageURL,
 		Message,
 		RollTable,
+		RollTableCreate,
+		RollTableUpdate,
 		Tag
 	} from '../../../../app';
-	import { capitalise } from '$lib';
-	import { SvelteComponent, onMount } from 'svelte';
+	import type { capitalise, rollFromTable } from '$lib';
+	import { SvelteComponent, createEventDispatcher, onMount } from 'svelte';
 
 	// import data from './data.json';
 	import * as DataTable from '$lib/components/ui/datatable';
@@ -36,11 +38,18 @@
 	import { toast } from 'svelte-sonner';
 	import Badge from '$lib/components/ui/badge/badge.svelte';
 	import DataTableToolbar from './data-table-toolbar.svelte';
-	import Rolltable from './Rolltable.svelte';
+	import Rolltable from './CreateRolltable.svelte';
+	import CreateRolltable from './CreateRolltable.svelte';
+	import ModifyRolltable from './ModifyRolltable.svelte';
+	import Roll from './Roll.svelte';
+	import type { wsController } from '$lib/ws';
 	// import DataTableToolbar from './data-table-toolbar.svelte';
 	// import DataTableEditMessage from './data-table-edit-message.svelte';
 
 	// let data: ImageURL[] = [];
+	const dispatch = createEventDispatcher<{
+		roll: { roll: ReturnType<typeof rollFromTable> };
+	}>();
 
 	const dataStore = writable<RollTable[]>([]);
 	const totalCount = writable<number>(1);
@@ -75,7 +84,7 @@
 		page: addPagination({
 			serverSide: true,
 			serverItemCount: totalCount,
-			initialPageIndex: 1,
+			initialPageIndex: 0,
 			initialPageSize: 20
 		}),
 		filter: addTableFilter({
@@ -150,14 +159,25 @@
 			accessor: (rolltable) => rolltable,
 			header: 'Edit',
 			id: 'edit',
-			cell: ({ value }) => createRender(Rolltable, { rolltable: value })
+			cell: ({ value }) =>
+				createRender(ModifyRolltable, { rollTable: value }).on(
+					'updateRollTable',
+					handleUpdateRolltable(value.rolltable_id)
+				)
+			// (e: CustomEvent<RollTableCreate>) => {
+			// 	client.POST('/rolltable/', { body: { ...e.detail } });
+			// }
+			// )
+		}),
+		table.column({
+			accessor: (rolltable) => rolltable,
+			header: 'Roll',
+			id: 'roll',
+			cell: ({ value }) =>
+				createRender(Roll, { rollTable: value }).on('roll', (e) => {
+					dispatch('roll', { roll: e.detail.roll });
+				})
 		})
-		// table.column({
-		// 	accessor: (message) => message,
-		// 	header: 'Edit',
-		// 	id: 'edit',
-		// 	cell: ({ value }) => createRender(DataTableEditMessage, { message: value })
-		// })
 
 		// table.column({
 		// 	accessor: 'palette',
@@ -193,35 +213,39 @@
 		}
 	}
 
-	// const handleNewCollection = (e: CustomEvent<{ name: string; items: number[] }>) => {
-	// 	createNewCollection(e.detail.name)
-	// 		.then((response) => {
-	// 			if (!response) throw new Error('Invalid Response');
-	// 			return addImagesToCollection(response, $selectedImageIDs);
-	// 		})
-	// 		.then((r) => {
-	// 			console.log(r);
-	// 			toast(`Added images successfully`);
-	// 		})
-	// 		.catch(() => {
-	// 			toast('An error occurred.');
-	// 		});
-	// };
-	// const handleExistingCollection = (
-	// 	e: CustomEvent<{ rolltable: Collection; items: number[] }>
-	// ) => {
-	// 	addImagesToCollection(e.detail.rolltable, e.detail.items)
-	// 		.then(() => {
-	// 			toast('Added images successfully');
-	// 		})
-	// 		.catch(() => {
-	// 			toast('An error occurred.');
-	// 		});
-	// };
+	const handleCreateRolltable = (e: CustomEvent<RollTableCreate>) => {
+		client.POST('/rolltable/', { body: { ...e.detail } }).then((response) => {
+			if (!response || !response.data) throw new Error('an error occurred');
+			dataStore.update((data) => [...data, response.data]);
+		});
+	};
+	const handleUpdateRolltable = (rolltable_id: number) => {
+		return (e: CustomEvent<RollTableUpdate>) => {
+			client
+				.PATCH('/rolltable/{rolltable_id}', {
+					params: { path: { rolltable_id } },
+					body: {
+						...e.detail
+					}
+				})
+				.then((response) => {
+					if (!response || !response.data) throw new Error('An unexpected error occurred');
+					dataStore.update((data) => {
+						let index = data.findIndex((t) => response.data.rolltable_id == t.rolltable_id);
+						if (!index) return data;
+						return [...data.slice(0, index), response.data, ...data.slice(index + 1)];
+					});
+				});
+		};
+	};
 </script>
 
 <div class="space-y-4">
-	<DataTableToolbar {tableModel} selection={selection.selectedDataIDs} />
+	<DataTableToolbar
+		{tableModel}
+		selection={selection.selectedDataIDs}
+		on:createRolltable={handleCreateRolltable}
+	/>
 	<!-- <div class="flex items-center py-4">
 		<Input
 			class="max-w-sm"

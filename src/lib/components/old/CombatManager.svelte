@@ -1,5 +1,5 @@
 <script lang="ts">
-	import CombatInitiativeOrder from '$lib/components/CombatInitiativeOrder.svelte';
+	import CombatInitiativeOrder from '../../../routes/(main)/session/[session_id]/CombatInitiativeOrder.svelte';
 	import type { components } from '$lib/api/v1';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';

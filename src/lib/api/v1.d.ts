@@ -124,6 +124,14 @@ export interface paths {
     /** Update Rolltable */
     patch: operations["update_rolltable"];
   };
+  "/rolltable/{rolltable_id}/row/add": {
+    /** Create Row On Rolltable */
+    post: operations["create_row_on_rolltable"];
+  };
+  "/rolltable/row/{rolltable_row_id}/remove": {
+    /** Delete Row From Rolltable */
+    delete: operations["delete_row_from_rolltable"];
+  };
   "/message/": {
     /**
      * List Messages
@@ -922,7 +930,7 @@ export interface components {
        * Rows
        * @default []
        */
-      rows?: components["schemas"]["RollTableRowCreate"][];
+      rows?: components["schemas"]["RollTableRowCreateInTable"][];
     };
     /** RollTableDB */
     RollTableDB: {
@@ -933,12 +941,10 @@ export interface components {
       /** Rolltable Id */
       rolltable_id: number;
     };
-    /** RollTableRowCreate */
-    RollTableRowCreate: {
+    /** RollTableRowCreateInTable */
+    RollTableRowCreateInTable: {
       /** Name */
       name: string;
-      /** Display Name */
-      display_name: string;
       /**
        * Weight
        * @default 1
@@ -948,15 +954,11 @@ export interface components {
       category?: string | null;
       /** Extra Data */
       extra_data?: components["schemas"]["RollTableRowData"][] | null;
-      /** Rolltable Id */
-      rolltable_id: number;
     };
     /** RollTableRowDB */
     RollTableRowDB: {
       /** Name */
       name: string;
-      /** Display Name */
-      display_name: string;
       /**
        * Weight
        * @default 1
@@ -968,6 +970,8 @@ export interface components {
       extra_data?: components["schemas"]["RollTableRowData"][] | null;
       /** Rolltable Row Id */
       rolltable_row_id: number;
+      /** Display Name */
+      display_name: string;
       /** Rolltable Id */
       rolltable_id: number;
     };
@@ -978,10 +982,10 @@ export interface components {
     };
     /** RollTableRowUpdate */
     RollTableRowUpdate: {
+      /** Rolltable Row Id */
+      rolltable_row_id: number;
       /** Name */
       name?: string | null;
-      /** Display Name */
-      display_name?: string | null;
       /** Weight */
       weight?: number | null;
       /** Category */
@@ -994,7 +998,7 @@ export interface components {
       /** Name */
       name?: string | null;
       /** Rows */
-      rows?: ((components["schemas"]["RollTableRowUpdate"] | components["schemas"]["RollTableRowCreate"])[]) | null;
+      rows?: ((components["schemas"]["RollTableRowUpdate"] | components["schemas"]["RollTableRowCreateInTable"])[]) | null;
     };
     /**
      * SortOption
@@ -1701,6 +1705,55 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["RollTableUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["RollTableDB"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Create Row On Rolltable */
+  create_row_on_rolltable: {
+    parameters: {
+      path: {
+        rolltable_id: number;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RollTableRowCreateInTable"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["RollTableDB"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Delete Row From Rolltable */
+  delete_row_from_rolltable: {
+    parameters: {
+      path: {
+        rolltable_row_id: number;
       };
     };
     responses: {

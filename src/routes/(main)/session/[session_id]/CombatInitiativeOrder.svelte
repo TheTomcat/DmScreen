@@ -12,12 +12,14 @@
 	} from '$lib';
 	import { flip } from 'svelte/animate';
 	import {
+		Cross,
 		CrossIcon,
 		Dices,
 		Droplets,
 		Eye,
 		EyeOff,
 		MessageSquareCode,
+		MoreHorizontal,
 		Pencil,
 		PlusSquare,
 		RefreshCw,
@@ -28,20 +30,22 @@
 		Trash2,
 		X
 	} from 'lucide-svelte';
-	import type { Participant, Entity, Combat } from '../../app';
+	import { toast } from 'svelte-sonner';
+	import type { Participant, Entity, Combat } from '../../../../app';
 	import client from '$lib/api/index';
 	import { combat } from '$lib/ws';
 	import * as Popover from '$lib/components/ui/popover';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 
 	import { Button } from '$lib/components/ui/button';
 	import { createEventDispatcher, onDestroy, tick } from 'svelte';
 	import type { wsController } from '$lib/ws';
-	import Autocomplete from './Autocomplete.svelte';
-	import EditableText from './EditableText.svelte';
+	import Autocomplete from '../../../../lib/components/Autocomplete.svelte';
+	import EditableText from '../../../../lib/components/EditableText.svelte';
 
 	import { entityHasData, parseAndCreateCounters } from '$lib/jsonschema';
-	import Statblock from './new/EntityDisplay/Statblock.svelte';
+	import Statblock from '../../../../lib/components/new/EntityDisplay/Statblock.svelte';
 
 	import * as Table from '$lib/components/ui/table';
 	import { cn } from '$lib/utils';
@@ -71,6 +75,8 @@
 	let conditionToAdd: string = '';
 	let conditions: string[] = [];
 
+	let concentrationDialogOpen: boolean = false;
+
 	let entities: Entity[] = [];
 	let statblockParticipant: Participant;
 	let statblockEntity: Entity;
@@ -90,7 +96,8 @@
 		'Prone',
 		'Restrained',
 		'Stunned',
-		'Exhausted'
+		'Exhausted',
+		'Concentrating'
 	];
 
 	const getUniqueEntityIds = (combat: Combat): number[] => {
@@ -175,10 +182,43 @@
 				if (!$combat) return;
 				dispatch('combat_updated', { combat: $combat });
 			});
+
+			// Concentration check
+			toast(
+				`${damageAmount} ${damaging ? 'damage' : 'healing'} done to ${damaging_participant.name}. ${
+					damaging && isConcentrating(damaging_participant)
+						? `Concentration check, DC ${Math.max(Math.floor(damageAmount / 2), 10)}`
+						: ''
+				}`
+			);
+			if (isConcentrating(damaging_participant)) showConcentrationDialog();
 		}
-		// damageDialog.close();
 		popoverOpen = false;
 	};
+	const isConcentrating = (p: Participant): boolean => {
+		return p.conditions.split(',').includes('concentrating');
+	};
+
+	const showConcentrationDialog = () => {
+		concentrationDialogOpen = true;
+	};
+	const handleConcentration = (success: boolean) => {
+		return () => {
+			if (!success && damaging_participant) {
+				damaging_participant.conditions =
+					damaging_participant?.conditions
+						.split(',')
+						.filter((c) => c != 'concentrating')
+						.join(',') || '';
+				controller.setConditions(damaging_participant.participant_id, conditions).then(() => {
+					if (!$combat) return;
+					dispatch('combat_updated', { combat: $combat });
+				});
+			}
+			concentrationDialogOpen = false;
+		};
+	};
+
 	const showConditionsDialog = (participant: Participant) => {
 		conditions_parcipitant = participant;
 		conditions = conditions_parcipitant.conditions.split(',').filter((s) => s);
@@ -418,7 +458,74 @@
 					</Table.Cell>
 
 					<Table.Cell>
-						<Button
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger asChild let:builder>
+								<Button builders={[builder]} variant="secondary">
+									<MoreHorizontal class="h-4 w-4" />
+								</Button>
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Content>
+								<DropdownMenu.Label>Actions</DropdownMenu.Label>
+								<DropdownMenu.Separator />
+
+								<DropdownMenu.Item
+									on:click={() =>
+										controller.updateParticipant(participant.participant_id, { damage: 0 })}
+								>
+									<Cross class="w-4 h-4 mr-1" /> Heal
+								</DropdownMenu.Item>
+								<DropdownMenu.Item
+									on:click={() => {
+										if (!$combat) return;
+										controller.updateParticipant(participant.participant_id, {
+											is_visible: !participant.is_visible
+										});
+										dispatch('combat_updated', { combat: $combat });
+									}}
+								>
+									{#if participant.is_visible}
+										<EyeOff class="w-4 h-4 mr-1" />
+										Hide
+									{:else}
+										<Eye class="w-4 h-4 mr-1" />
+										Show
+									{/if}
+								</DropdownMenu.Item>
+								<DropdownMenu.Item
+									on:click={() => {
+										if (!$combat) return;
+										controller.updateCombat({
+											combat: { ...$combat, active_participant_id: participant.participant_id }
+										});
+										dispatch('combat_updated', { combat: $combat });
+									}}
+								>
+									Set Initiative Order Here
+								</DropdownMenu.Item>
+								<DropdownMenu.Separator />
+								<DropdownMenu.Item
+									on:click={() => {
+										if ($combat && $combat?.active_participant_id == participant.participant_id) {
+											let p = get_next_alive_participant_id(
+												$combat?.active_participant_id,
+												$combat?.participants
+											);
+											if (p.have_looped) {
+											}
+											controller.advanceCombat({
+												...p
+											});
+											controller.removeParticipant(participant.participant_id);
+										} else {
+											controller.removeParticipant(participant.participant_id);
+										}
+										if (!$combat) return;
+										dispatch('combat_updated', { combat: $combat });
+									}}><Trash2 class="w-4 h-4 mr-1" />Delete</DropdownMenu.Item
+								>
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
+						<!-- <Button
 							variant="ghost"
 							class="h-8 m-0 p-2"
 							on:click={() => {
@@ -439,7 +546,7 @@
 							}}
 						>
 							<Trash2 class="w-4 h-4" />
-						</Button>
+						</Button> -->
 					</Table.Cell>
 				</tr>
 			{/each}
@@ -589,6 +696,24 @@
 				on:click={() => {
 					conditionsDialogOpen = false;
 				}}>Cancel</Button
+			>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={concentrationDialogOpen}>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>Concentration</Dialog.Title>
+			<Dialog.Description
+				>{damaging_participant?.name} must make a DC {Math.max(Math.floor(damageAmount / 2), 10)} concentration
+				check</Dialog.Description
+			>
+		</Dialog.Header>
+		<Dialog.Footer class="flex justify-between gap-2">
+			<Button on:click={handleConcentration(true)}>Pass</Button><Button
+				variant="destructive"
+				on:click={handleConcentration(false)}>Fail</Button
 			>
 		</Dialog.Footer>
 	</Dialog.Content>

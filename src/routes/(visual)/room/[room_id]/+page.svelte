@@ -141,7 +141,7 @@
 		{/if}
 		{#if $playerStateStore.handout_display}
 			<div class="handoutcontainer">
-				<div class="messagebox handoutbox h-[90vh]" transition:scale>
+				<div class="h-[90vh] messagebox handoutbox" transition:scale>
 					<Handout />
 				</div>
 			</div>

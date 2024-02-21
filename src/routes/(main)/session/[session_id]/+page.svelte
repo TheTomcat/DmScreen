@@ -1,11 +1,13 @@
 <script lang="ts">
+	import LogSheet from './LogSheet.svelte';
+
 	import OverlayManager from './OverlayManager.svelte';
 
 	import PresetManager from './PresetManager.svelte';
 
 	import SessionHeader from './SessionHeader.svelte';
 
-	import { toast } from '@zerodevx/svelte-toast';
+	import { toast } from 'svelte-sonner';
 	// import { sessionStore, type Session, refresh } from '$lib/stores/sessionStore.js';
 
 	import { page } from '$app/stores';
@@ -18,6 +20,7 @@
 		Cross,
 		Dices,
 		FileSearch,
+		Megaphone,
 		RefreshCw,
 		Swords,
 		UploadCloud
@@ -36,7 +39,7 @@
 	// import Dialog from '$lib/components/Dialog.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 
-	import CombatInitiativeOrder from '$lib/components/CombatInitiativeOrder.svelte';
+	import CombatInitiativeOrder from './CombatInitiativeOrder.svelte';
 	import CombatSetup from '$lib/components/new/CombatSetup.svelte';
 	import HitPointTable from '$lib/components/new/HitPointTable.svelte';
 	import * as Sheet from '$lib/components/ui/sheet';
@@ -53,6 +56,10 @@
 	import MapSelect from '$lib/components/new/MapSelect.svelte';
 	import ScrollBox from '$lib/components/ScrollBox.svelte';
 	import DataTable from '$lib/components/datatables/combats/data-table.svelte';
+	import RolltableDataTable from '$lib/components/datatables/rolltables/data-table.svelte';
+	import MessageBox from './MessageBox.svelte';
+	import { isAnnouncing } from '$lib/announcement';
+	import { push } from '$lib/stores/logStore';
 
 	let ws: wsController;
 
@@ -72,6 +79,8 @@
 	let imageSelectionMode: 'backdrop' | 'handout' | 'map' = 'backdrop';
 
 	let presets: Preset[];
+
+	let logSheetOpen: boolean = false;
 
 	onMount(() => {
 		ws = new wsController(`/live/socket/${session_id}`);
@@ -143,7 +152,7 @@
 		// ws.updateCombat({ combat: $combat });
 	};
 
-	const screens = ['Background', 'Combat', 'Overlays', 'Presets'];
+	const screens = ['Background', 'Combat', 'Overlays', 'Rolltables', 'Presets'];
 	let currentScreen = 'Combat';
 </script>
 
@@ -174,8 +183,16 @@
 			BODY 
 		-->
 		<div class="border-solid border rounded-lg border-gray-600 p-3 my-3">
-			<ScrollBox items={screens} bind:currentItem={currentScreen} />
-
+			<!-- <div class="grid grid-cols-[1fr_300px] gap-2">
+				<div> -->
+			<div class="flex justify-between">
+				<ScrollBox items={screens} bind:currentItem={currentScreen} />
+				<Button
+					on:click={() => {
+						logSheetOpen = true;
+					}}>Show Log</Button
+				>
+			</div>
 			{#if currentScreen == 'Overlays'}
 				<OverlayManager {ws} bind:imageSelectionMode bind:selectionOpen />
 			{:else if currentScreen == 'Background'}
@@ -253,6 +270,36 @@
 				<DisplayImage image_id={$playerStateStore.background_image_id} />
 			{:else if currentScreen == 'Presets'}
 				<PresetManager {ws} />
+			{:else if currentScreen == 'Rolltables'}
+				<RolltableDataTable
+					on:roll={(e) => {
+						let roll = e.detail.roll;
+						let msg = `Rolled 1d${roll.totalWeight}: ${roll.roll}. Got ${roll.result.name}`;
+						if (ws) {
+							push(
+								msg,
+								{
+									action: {
+										label: 'Announce',
+										onClick: () => {
+											if (!ws) return;
+											ws.announce({
+												message: roll.result.name,
+												timeout: $playerStateStore.announce_timeout,
+												display: true
+											});
+											isAnnouncing.set(true);
+										},
+										icon: Megaphone
+									}
+								},
+								true
+							);
+						} else {
+							toast.info(msg);
+						}
+					}}
+				/>
 			{:else if $playerStateStore && !$playerStateStore.combat}
 				<DataTable
 					{ws}
@@ -328,6 +375,9 @@
 					{/if}
 				{/if}
 			{/if}
+			<!-- </div>
+				<MessageBox />
+			</div> -->
 		</div>
 	</div>
 {:else}
@@ -367,6 +417,8 @@
 		/>
 	</Sheet.Content>
 </Sheet.Root>
+
+<LogSheet bind:logSheetOpen />
 
 {#if $combat && $combat.participants}
 	<CombatSetup

@@ -18,7 +18,8 @@
 		Wrench,
 		Settings2,
 		ChevronDown,
-		Heart
+		Heart,
+		Table
 	} from 'lucide-svelte';
 
 	import { Button } from '$lib/components/ui/button';
@@ -122,6 +123,11 @@
 						<DropdownMenu.Item href="/library/combats">
 							<Swords class="mr-2 h-4 w-4" />
 							<span>Combats</span>
+							<!-- <DropdownMenu.Shortcut>⌘S</DropdownMenu.Shortcut> -->
+						</DropdownMenu.Item>
+						<DropdownMenu.Item href="/library/rolltables">
+							<Table class="mr-2 h-4 w-4" />
+							<span>Rolltables</span>
 							<!-- <DropdownMenu.Shortcut>⌘S</DropdownMenu.Shortcut> -->
 						</DropdownMenu.Item>
 						<DropdownMenu.Item disabled={true}>

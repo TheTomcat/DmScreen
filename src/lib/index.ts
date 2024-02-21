@@ -1,7 +1,8 @@
 // place files you want to import through the `$lib` alias in this folder.
 import { writable } from "svelte/store";
-import type { RollMode } from "../app";
+import type { RollMode, RollTable, RollTableRow } from "../app";
 import type { components } from "./api/v1";
+import { announcement } from "./announcement";
 
 type Participant = components['schemas']['Participant'];
 type Combat = components['schemas']['Combat'];
@@ -237,6 +238,39 @@ export const encodeCR = (cr_str: string | null | undefined): number | undefined 
     }
 }
 
+export type HasWeight = { weight?: number | null } & { [id: string]: any };
+export type HasRows = { rows: HasWeight[] } & { [id: string]: any };
+
+export type RollTableResult = {
+    totalWeight: number,
+    roll: number,
+    result: RollTableRow
+}
+
+export const calcTotalWeight = (r: any) => {
+    return r.rows.reduce(accumulate, 0);
+};
+export const accumulate = (partialSum: number, row: HasWeight) => {
+    return partialSum + (row.weight || 1);
+};
+export const rollFromTable = (rolltable: RollTable): RollTableResult => {
+    let totalWeight = calcTotalWeight(rolltable);
+    // console.log(totalWeight)
+    let roll = Math.floor(Math.random() * totalWeight);
+    console.log(roll)
+    return {
+        totalWeight, roll: roll + 1, result:
+            rolltable.rows.find((row) => {
+                roll -= (row.weight || 1);
+                return roll < 0;
+            }) as RollTableRow
+    };
+};
+
+export const renderRollRange = (weight: number, sofar: number) => {
+    if (weight == 1) return `${sofar + 1}`;
+    return `${sofar + 1}-${sofar + weight}`;
+};
 
 export const logc = (handle: Function) => {
     const f = ({ args }: any) => {

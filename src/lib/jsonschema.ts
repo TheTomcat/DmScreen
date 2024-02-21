@@ -240,11 +240,11 @@ const proficiencyBonus = {
     "29": 9, "30": 9
 }
 
-export const parseAction = (entry: string) => {
+export const parseAction = (entry: string, renderFunction = formatAction) => {
     // const re = new RegExp(/\{\@([a-z]+)[\s]*([^\}]+)?\}/, 'g')
     const re = new RegExp(/\{\@([a-z]+)[\s]*([^\}\|]+)?(?:\|([^\}]+))*\}/, 'g')
 
-    return entry.replaceAll(re, (a, b, c, d) => formatAction(b, c))
+    return entry.replaceAll(re, (a, command, parameter, d) => renderFunction(command, parameter))
 }
 
 type BlockCommand = 'dc' | 'b' | 'i' | 'damage' | 'recharge' | 'book' | 'condition'

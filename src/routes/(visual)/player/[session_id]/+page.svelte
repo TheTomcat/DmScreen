@@ -23,7 +23,7 @@
 	import { Cpu, Dices, Droplets } from 'lucide-svelte';
 	import { onDestroy, onMount } from 'svelte';
 	import { flip } from 'svelte/animate';
-	import CombatInitiativeOrder from '$lib/components/CombatInitiativeOrder.svelte';
+	import CombatInitiativeOrder from '../../../(main)/session/[session_id]/CombatInitiativeOrder.svelte';
 	import BackgroundEffect from '$lib/components/BackgroundEffect.svelte';
 	import { combat, loadCombat, set_active_participant } from '$lib/stores/combatStore';
 	import BouncingText from '$lib/components/textEffects/BouncingText.svelte';

@@ -6,7 +6,7 @@
 	// import type { Task } from "../(data)/schemas";
 	import type { TableViewModel } from 'svelte-headless-table';
 	import { Button } from '$lib/components/ui/button';
-	import { Cross, GalleryHorizontalEnd } from 'lucide-svelte';
+	import { Cross, GalleryHorizontalEnd, PlusCircle } from 'lucide-svelte';
 	// import { statuses, priorities } from "../(data)/data";
 	import type { Writable } from 'svelte/store';
 	import type { Collection, ImageType, ImageURL, Message, RollTable } from '../../../../app';
@@ -21,6 +21,7 @@
 	import { createEventDispatcher } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { plural } from '$lib';
+	import CreateRolltable from './CreateRolltable.svelte';
 
 	const { pluginStates } = tableModel;
 	const {
@@ -58,8 +59,9 @@
 			</Button>
 		{/if}
 	</div>
-	<div class="flex-1 text-sm text-muted-foreground text-right">
-		{$selection.length} messages selected.
+	<div class="flex text-sm text-muted-foreground text-right gap-2 items-center">
+		{$selection.length}
+		{plural($selection.length, 'rolltable')} selected.
+		<CreateRolltable on:createRolltable />
 	</div>
-	<!-- <DataTableViewOptions {tableModel} /> -->
 </div>

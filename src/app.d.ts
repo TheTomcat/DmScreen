@@ -35,6 +35,7 @@ type RollTableRow = components['schemas']['RollTableRowDB'];
 type RollTableUpdate = components['schemas']['RollTableUpdate'];
 type RollTableCreate = components['schemas']['RollTableCreate'];
 
+
 type RollTableBase = components['schemas']['RollTableBase'];
 
 export type _ImageMatch = {
