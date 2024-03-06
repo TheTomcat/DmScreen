@@ -49,9 +49,13 @@
 					<!-- <DropdownMenu.Label>Manage</DropdownMenu.Label> -->
 					<!-- <DropdownMenu.Separator /> -->
 					<DropdownMenu.Group>
-						<DropdownMenu.Item href="/build">
+						<DropdownMenu.Item href="/library/combats/build">
 							<Swords class="mr-2 h-4 w-4" />
 							<span>Build</span>
+						</DropdownMenu.Item>
+						<DropdownMenu.Item href="/library/combats/build" disabled>
+							<Pencil class="mr-2 h-4 w-4" />
+							<span>Edit</span>
 						</DropdownMenu.Item>
 					</DropdownMenu.Group>
 				</DropdownMenu.Content>

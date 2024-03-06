@@ -635,6 +635,110 @@ export const parseJSONToEntity = (json: string | object): Omit<Entity, 'entity_i
     }
 }
 
+const Roc: Creature = {
+    source: 'HB',
+    page: 0,
+    name: 'Adolescent Roc (Action Oriented)',
+    ac: [15],
+    hp: {
+        formula: '9d20+45',
+        average: 139
+    },
+    alignment: ['U'],
+    size: 'L',
+    cr: '8',
+    str: 24,
+    dex: 10,
+    con: 20,
+    int: 3,
+    wis: 10,
+    cha: 9,
+    speed: {
+        fly: 120,
+        walk: 20
+    },
+
+    save: {
+        dex: '+3',
+        con: '+8',
+        wis: '+3',
+        cha: '+2'
+    },
+    passive: 13,
+    skill: {
+        perception: '+3',
+    },
+    trait: [
+        {
+            name: 'Keen Sight',
+            entries: ['The roc has advantage on Wisdom (Perception) checks that rely on sight. ']
+        },
+        {
+            name: 'Partial Legendary Resistance (2/Day)',
+            entries: [
+                'If the roc fails a saving throw, it can choose to succeed instead. By focusing on breaking control of whatever tried to influence it however, the next attack against the roc has advantage.'
+            ]
+
+        }
+    ],
+    action: [
+        {
+            name: 'Multiattack',
+            entries: ['The roc makes two attacks: one with its beak and one with its talons.']
+        },
+        {
+            name: 'Beak',
+            entries: ['{@atk mw} {@hit 6} to hit, reach 5 ft., one target. {@h}17 ({@damage 2d8 + 4}) piercing damage."']
+        },
+        {
+            name: "Talons",
+            entries: [
+                "{@atk mw} {@hit 6} to hit, reach 5 ft., one target. {@h}15 ({@damage 2d6 + 4}) slashing damage."
+            ]
+        },
+        {
+            name: "Wing Strike",
+            entries: [
+                "{@atk mw} {@hit 6} to hit, reach 15 ft., one target. {@h}16 ({@damage 2d8 + 7}) bludgeoning damage. The force of the strike causes any creature within 15 feet of the target to make a {@dc 16} Dexterity saving throw, on a failure being moved 5 feet from the target. Then roc may then move up to 15 feet immediately after the attack without incurring an opportunity attack. If the roc has a creature {@condition grappled} in its talons, the roc can't use its wing strike without dropping the creature."
+            ]
+        }
+    ],
+    bonus: [
+        {
+            name: 'Wing Buffet',
+            entries: ['If the roc uses its action to dash, when it comes to a stop it may buffet its wings and send powerful blasts of air all around itself. Each creature within 30 feet of the roc must succeed on a DC 16 Strength saving throw or be knocked prone. If at least one creature is knocked prone, the roc may immediately make one Wing Strike attack against that creature.']
+        }
+    ],
+    reactions: [
+        {
+            name: 'Challenging Call',
+            entries: ["After a creature attacks the roc, it lets out a screech as it stares the creature down. The creature must succeed on a DC 16 Charisma saving throw or fail the challenging call, giving the roc advantage on all attacks against the creature until the ends of the roc's turn."]
+        },
+        {
+            name: 'Talon Crush',
+            entries: ["When a creature grappled in the roc's talons either makes an attack against the roc or fails to escape the roc's talons, the roc may in turn make a talon attack against the creature. The damage type changes from slashing to bludgeoning."]
+        }
+    ],
+    legendary: [
+        {
+            name: 'Wind Sweep (1)',
+            entries: ["The roc may move up to 30 feet, centering itself over one creature. The roc then begins to beat its wings, causing winds to sweep across the ground until the start of its next turn. Any creature within 30 feet and not centered beneath the roc must succeed on a DC 16 Strength saving throw or be pushed back 20 feet and knocked prone. While the roc continues to beat its wings, the area within 20 feet of the roc becomes difficult terrain."]
+        },
+        {
+            name: 'Debris Kick (2)',
+            entries: ["The roc furiously beats its wings causing any debris, dirt, or other light items on the ground to be kicked up. All players within 30 feet of the roc must succeed on a DC 16 Dexterity saving throw or be blinded until the end of the roc's next turn."]
+        },
+        {
+            name: 'Trance Wings (3)',
+            entries: ["The roc lets the colors on it's feathers begin to swirl and weave along it's wings, creating a trance inducing pattern. Each creature in the area who sees the pattern must succeed on a DC 16 Wisdom saving throw, or become charmed until the end of the roc's next turn. While charmed, the creature in incapacitated and has a speed of 0."]
+        },
+        {
+            name: "Take Flight (any time)",
+            entries: ["When the roc has less than 50 hit points, it may take to the air and travel up to its speed without incurring an opportunity attack. Should the roc currently have a creature grappled with its talons, it releases the creature before flying away."]
+        }
+    ]
+}
+
 const creatures: Creature[] = [
     {
         "name": "Aarakocra",

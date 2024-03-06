@@ -521,8 +521,10 @@
 										}
 										if (!$combat) return;
 										dispatch('combat_updated', { combat: $combat });
-									}}><Trash2 class="w-4 h-4 mr-1" />Delete</DropdownMenu.Item
-								>
+									}}
+									><Trash2 class="w-4 h-4 mr-1" />Delete
+								</DropdownMenu.Item>
+								<DropdownMenu.Item disabled>Clone</DropdownMenu.Item>
 							</DropdownMenu.Content>
 						</DropdownMenu.Root>
 						<!-- <Button
